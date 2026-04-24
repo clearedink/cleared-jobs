@@ -1,2 +1,2 @@
-// Cleared Worker Adapter
-export const adapterName = 'worker';
+export * from './callback-client';
+export * from './fake-worker';
