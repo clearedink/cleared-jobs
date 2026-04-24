@@ -26,6 +26,16 @@ export interface IPaymentPort {
   }>;
 
   /**
+   * Verify a cryptographic proof of payment
+   */
+  verifyProof(proof: string): Promise<{
+    paymentIdentifier: string;
+    amount: bigint;
+    currency: string;
+    verified: boolean;
+  }>;
+
+  /**
    * Release funds from escrow to the provider.
    */
   releaseEscrow(paymentIdentifier: string): Promise<boolean>;

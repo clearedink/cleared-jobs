@@ -129,9 +129,27 @@ export class MemoryStorage implements IStoragePort {
   }
 
   /**
+   * Atomic operation wrapper for job admission
+   */
+  async withPaymentIdentifierLock<T>(
+    paymentIdentifier: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const acquired = await this.acquireAdmissionLock(paymentIdentifier);
+    if (!acquired) {
+      throw new Error('Could not acquire admission lock');
+    }
+    try {
+      return await operation();
+    } finally {
+      await this.releaseAdmissionLock(paymentIdentifier);
+    }
+  }
+
+  /**
    * Simple admission lock implementation for local dev
    */
-  async acquireAdmissionLock(paymentIdentifier: string): Promise<boolean> {
+  private async acquireAdmissionLock(paymentIdentifier: string): Promise<boolean> {
     if (this.admissionLocks.has(paymentIdentifier)) {
       return false;
     }

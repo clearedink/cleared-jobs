@@ -48,4 +48,12 @@ export interface IStoragePort {
 
   // Audit (Invariant 6: log every action)
   saveAuditLog(entry: any): Promise<void>;
+
+  /**
+   * Atomic operation wrapper for job admission
+   */
+  withPaymentIdentifierLock<T>(
+    paymentIdentifier: string,
+    operation: () => Promise<T>
+  ): Promise<T>;
 }
