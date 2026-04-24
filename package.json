@@ -6,7 +6,11 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "demo:happy": "bash scripts/demo-happy-path.sh",
+    "demo:retry": "bash scripts/demo-duplicate-retry.sh",
+    "demo:lost": "bash scripts/demo-lost-response.sh",
+    "demo:timeout": "bash scripts/demo-timeout.sh"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

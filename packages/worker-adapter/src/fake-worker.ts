@@ -12,7 +12,8 @@ export class FakeWorker {
     await this.client.startAttempt(job.executionId);
 
     // 2. Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const delay = job.inputs.sleep_ms || 1000;
+    await new Promise(resolve => setTimeout(resolve, delay));
 
     // 3. Selective failure based on input flag
     if (job.inputs.force_failure === true) {
