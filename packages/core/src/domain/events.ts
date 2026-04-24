@@ -1,16 +1,20 @@
-import { JobId, QuoteId, PaymentId, ExecutionId } from './ids';
-import { JobStatus, QuoteStatus, EscrowState } from './statuses';
+import { JobId, QuoteId, PaymentId, ExecutionId, ResolutionId } from './ids';
+import { JobStatus, QuoteStatus, EscrowState, ResolutionState } from './statuses';
 
 export type DomainEventType =
   | 'QUOTE_CREATED'
-  | 'QUOTE_ACCEPTED'
-  | 'PAYMENT_RECEIVED'
+  | 'QUOTE_FUNDED'
   | 'JOB_ADMITTED'
+  | 'JOB_DISPATCHED'
   | 'JOB_STARTED'
   | 'JOB_COMPLETED'
   | 'JOB_FAILED'
+  | 'ESCROW_RELEASE_PENDING'
   | 'ESCROW_RELEASED'
-  | 'ESCROW_REFUNDED';
+  | 'ESCROW_REFUND_PENDING'
+  | 'ESCROW_REFUNDED'
+  | 'RESOLUTION_MANUAL_REVIEW_TRIGGERED'
+  | 'OPERATOR_ACTION_TAKEN';
 
 export interface BaseEvent {
   id: string;
@@ -23,16 +27,10 @@ export interface QuoteCreatedEvent extends BaseEvent {
   quoteId: QuoteId;
 }
 
-export interface PaymentReceivedEvent extends BaseEvent {
-  type: 'PAYMENT_RECEIVED';
-  paymentId: PaymentId;
-  quoteId: QuoteId;
-}
-
 export interface JobAdmittedEvent extends BaseEvent {
   type: 'JOB_ADMITTED';
   jobId: JobId;
-  quoteId: QuoteId;
+  paymentIdentifier: string;
 }
 
 export interface JobCompletedEvent extends BaseEvent {
@@ -41,18 +39,37 @@ export interface JobCompletedEvent extends BaseEvent {
   outputHash: string;
 }
 
+export interface EscrowReleasedEvent extends BaseEvent {
+  type: 'ESCROW_RELEASED';
+  jobId: JobId;
+  paymentId: PaymentId;
+}
+
+export interface OperatorActionEvent extends BaseEvent {
+  type: 'OPERATOR_ACTION_TAKEN';
+  actor: string;
+  action: string;
+  reason: string;
+}
+
 export type DomainEvent =
   | QuoteCreatedEvent
-  | PaymentReceivedEvent
   | JobAdmittedEvent
-  | JobCompletedEvent;
+  | JobCompletedEvent
+  | EscrowReleasedEvent
+  | OperatorActionEvent;
 
 export interface AuditLogEntry {
   id: string;
   timestamp: Date;
   action: string;
-  actor: string;
-  resourceType: 'JOB' | 'QUOTE' | 'PAYMENT';
+  actor: string; // 'SYSTEM', 'WORKER', or operator ID
+  resourceType: 'JOB' | 'QUOTE' | 'PAYMENT' | 'RESOLUTION';
   resourceId: string;
   payload: Record<string, any>;
+  metadata: {
+    ipAddress?: string;
+    userAgent?: string;
+    correlationId?: string;
+  };
 }

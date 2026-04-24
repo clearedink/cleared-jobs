@@ -7,7 +7,7 @@ export interface JobTemplate {
   description?: string;
   priceAmount: bigint;
   priceCurrency: string;
-  inputSchema: any; // JSON Schema or similar
+  inputSchema: any;
   outputSchema: any;
   createdAt: Date;
 }
@@ -24,14 +24,19 @@ export interface Quote {
   createdAt: Date;
 }
 
+/**
+ * Encapsulates the financial life of a job.
+ * Queryable independently from Job execution status.
+ */
 export interface PaymentRecord {
   id: PaymentId;
   quoteId: QuoteId;
-  externalTransactionId?: string;
+  jobId?: JobId; // Linked once admitted
+  paymentIdentifier: string; // The external reference (e.g. x402 address or transaction hash)
   amount: bigint;
   currency: string;
   escrowState: EscrowState;
-  paymentRail: string; // e.g. 'x402', 'stripe', etc.
+  paymentRail: string;
   metadata: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
@@ -47,12 +52,20 @@ export interface ExecutionAttempt {
   error?: string;
 }
 
+/**
+ * Result of a successful job execution.
+ * Must remain retrievable even if response path failed.
+ */
 export interface JobResult {
   jobId: JobId;
   output: Record<string, any>;
   completedAt: Date;
 }
 
+/**
+ * The final resolution of funds.
+ * Decoupled from execution status.
+ */
 export interface ResolutionRecord {
   id: ResolutionId;
   jobId: JobId;
@@ -62,12 +75,12 @@ export interface ResolutionRecord {
 }
 
 export interface Job {
-  id: JobId;
+  id: JobId; // The canonical identity for all post-payment actions
   quoteId: QuoteId;
   templateId: JobTemplateId;
   status: JobStatus;
   inputs: Record<string, any>;
-  paymentId?: PaymentId;
+  paymentIdentifier: string; // Link back to the immutable payment source
   currentAttemptId?: ExecutionId;
   resolutionId?: ResolutionId;
   createdAt: Date;

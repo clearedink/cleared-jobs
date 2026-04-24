@@ -9,7 +9,7 @@ export interface CreateQuoteCommand {
 export interface CreateQuoteResult {
   quote: Quote;
   paymentIntent: {
-    externalId: string;
+    paymentIdentifier: string; // The canonical payment reference
     clientConfig: Record<string, any>;
   };
 }

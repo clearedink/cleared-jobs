@@ -2,7 +2,7 @@ import { QuoteId, JobId } from '../domain/ids';
 
 export interface AdmitFundedJobCommand {
   quoteId: QuoteId;
-  paymentTransactionId: string;
+  paymentIdentifier: string; // The canonical payment reference
 }
 
 export interface AdmitFundedJobResult {

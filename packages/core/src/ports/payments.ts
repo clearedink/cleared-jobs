@@ -1,36 +1,37 @@
 import { Quote } from '../domain/models';
-import { EscrowState } from '../domain/statuses';
 
 export interface PaymentIntent {
-  externalId: string;
+  paymentIdentifier: string; // The canonical identifier for this funding event
   amount: bigint;
   currency: string;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED';
-  clientConfig: Record<string, any>; // Used by frontend to complete payment
+  status: 'OPEN' | 'FUNDED' | 'EXPIRED';
+  clientConfig: Record<string, any>;
 }
 
 export interface IPaymentPort {
   /**
-   * Initialize a payment for a specific quote
+   * Initialize a payment for a specific quote.
+   * Returns the paymentIdentifier which will be used to admit the job.
    */
   createIntent(quote: Quote): Promise<PaymentIntent>;
 
   /**
-   * Verify a payment received from a rail
+   * Verify a payment received from a rail.
+   * must return the canonical paymentIdentifier for that rail.
    */
-  verifyPayment(externalId: string): Promise<{
+  verifyPayment(paymentIdentifier: string): Promise<{
     amount: bigint;
     currency: string;
     verified: boolean;
   }>;
 
   /**
-   * Release funds from escrow to the provider
+   * Release funds from escrow to the provider.
    */
-  releaseEscrow(externalId: string): Promise<boolean>;
+  releaseEscrow(paymentIdentifier: string): Promise<boolean>;
 
   /**
-   * Refund funds from escrow back to the user
+   * Refund funds from escrow back to the user.
    */
-  refundEscrow(externalId: string): Promise<boolean>;
+  refundEscrow(paymentIdentifier: string): Promise<boolean>;
 }
