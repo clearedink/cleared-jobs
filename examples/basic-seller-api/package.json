@@ -12,6 +12,7 @@
     "@cleared/http-402-express": "workspace:*",
     "@cleared/payment-x402": "workspace:*",
     "@cleared/storage-memory": "workspace:*",
+    "@cleared/worker-adapter": "workspace:*",
     "express": "^4.18.0"
   },
   "devDependencies": {
