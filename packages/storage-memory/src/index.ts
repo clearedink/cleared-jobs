@@ -1,2 +1,1 @@
-// Cleared In-Memory Storage
-export const storageType = 'memory';
+export * from './memory-storage';

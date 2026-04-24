@@ -1,5 +1,6 @@
-import { Job, JobResult, JobTemplate, PaymentRecord, Quote, ResolutionRecord } from '../domain/models';
-import { JobId, JobTemplateId, PaymentId, QuoteId, ResolutionId } from '../domain/ids';
+import { ExecutionAttempt, Job, JobResult, JobTemplate, PaymentRecord, Quote, ResolutionRecord } from '../domain/models';
+import { DomainEvent } from '../domain/events';
+import { ExecutionId, JobId, JobTemplateId, PaymentId, QuoteId, ResolutionId } from '../domain/ids';
 
 export interface IStoragePort {
   // Templates
@@ -15,6 +16,7 @@ export interface IStoragePort {
   savePayment(payment: PaymentRecord): Promise<void>;
   getPayment(id: PaymentId): Promise<PaymentRecord | null>;
   getPaymentByQuoteId(quoteId: QuoteId): Promise<PaymentRecord | null>;
+  getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null>;
   
   /**
    * Enforces invariant 1: one paymentIdentifier admits at most one job
@@ -34,6 +36,15 @@ export interface IStoragePort {
   saveResolution(resolution: ResolutionRecord): Promise<void>;
   getResolution(id: ResolutionId): Promise<ResolutionRecord | null>;
   getResolutionByJobId(jobId: JobId): Promise<ResolutionRecord | null>;
+
+  // Attempts
+  saveAttempt(attempt: ExecutionAttempt): Promise<void>;
+  getAttempt(id: ExecutionId): Promise<ExecutionAttempt | null>;
+  listAttemptsByJobId(jobId: JobId): Promise<ExecutionAttempt[]>;
+
+  // Events
+  saveDomainEvent(event: DomainEvent): Promise<void>;
+  listDomainEventsByAggregateId(aggregateId: string): Promise<DomainEvent[]>;
 
   // Audit (Invariant 6: log every action)
   saveAuditLog(entry: any): Promise<void>;
