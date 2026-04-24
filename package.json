@@ -1,0 +1,16 @@
+{
+  "name": "cleared-sdk-monorepo",
+  "private": true,
+  "description": "Cleared SDK: Hackathon-scoped durable job lifecycle for batch enrichment",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "zod": "^3.0.0"
+  }
+}
