@@ -9,6 +9,8 @@ export interface JobTemplate {
   priceCurrency: string;
   inputSchema: any;
   outputSchema: any;
+  slaSeconds: number;
+  timeoutPolicy: 'REFUND' | 'RETRY' | 'MANUAL';
   createdAt: Date;
 }
 
