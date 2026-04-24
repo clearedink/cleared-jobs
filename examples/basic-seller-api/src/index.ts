@@ -133,6 +133,47 @@ app.get('/v1/jobs/:jobId', async (req, res, next) => {
 });
 
 /**
+ * ADMIN: Trigger timeout evaluation scan
+ */
+app.post('/admin/timeout-scan', async (req, res, next) => {
+  try {
+    const { evaluateTimeouts } = await import('@cleared/core');
+    const count = await evaluateTimeouts(storage, payments, clock);
+    res.json({ scanned: true, timedOutCount: count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * ADMIN: Manually trigger refund
+ */
+app.post('/admin/jobs/:jobId/refund', async (req, res, next) => {
+  try {
+    const { operatorMarkRefund } = await import('@cleared/core');
+    const jobId = createJobId(req.params.jobId);
+    await operatorMarkRefund(jobId, 'admin-1', 'Manual refund via support', storage, payments, clock);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * ADMIN: Transition to manual review
+ */
+app.post('/admin/jobs/:jobId/review', async (req, res, next) => {
+  try {
+    const { operatorMarkManualReview } = await import('@cleared/core');
+    const jobId = createJobId(req.params.jobId);
+    await operatorMarkManualReview(jobId, 'admin-1', 'Complex case review', storage, clock);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * Get Job Result
  */
 app.get('/v1/jobs/:jobId/result', async (req, res, next) => {

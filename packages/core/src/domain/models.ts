@@ -85,6 +85,7 @@ export interface Job {
   paymentIdentifier: string; // Link back to the immutable payment source
   currentAttemptId?: ExecutionId;
   resolutionId?: ResolutionId;
+  deadlineAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }

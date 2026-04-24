@@ -89,6 +89,9 @@ export async function admitFundedJob(
     await storage.saveQuote(quote);
 
     // 7. Create funded job
+    const template = await storage.getTemplate(quote.templateId);
+    const deadlineAt = new Date(clock.now().getTime() + (template?.slaSeconds || 60) * 1000);
+    
     const jobId = createJobId(randomUUID());
     const job: Job = {
       id: jobId,
@@ -97,6 +100,7 @@ export async function admitFundedJob(
       status: JobStatus.FUNDED,
       inputs: quote.inputs,
       paymentIdentifier: command.paymentIdentifier,
+      deadlineAt,
       createdAt: clock.now(),
       updatedAt: clock.now(),
     };

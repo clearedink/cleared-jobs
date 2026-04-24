@@ -17,6 +17,8 @@ export * from './services/admit-funded-job';
 export * from './services/get-job-status';
 export * from './services/get-job-result';
 export * from './services/worker-callbacks';
+export * from './services/timeout-evaluator';
+export * from './services/operator-actions';
 
 export * from './lib/hash-input';
 export * from './lib/errors';

@@ -27,6 +27,7 @@ export interface IStoragePort {
   saveJob(job: Job): Promise<void>;
   getJob(id: JobId): Promise<Job | null>;
   getJobByQuoteId(quoteId: QuoteId): Promise<Job | null>;
+  listActiveJobs(): Promise<Job[]>;
 
   // Results (Invariant 4: result retrievable independently)
   saveResult(result: JobResult): Promise<void>;
