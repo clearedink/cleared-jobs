@@ -9,6 +9,7 @@ export async function getJobStatus(
   if (!job) {
     throw new Error('Job not found');
   }
+
   return {
     jobId: job.id,
     status: job.status,

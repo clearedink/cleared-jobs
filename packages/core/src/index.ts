@@ -16,6 +16,7 @@ export * from './services/create-quote';
 export * from './services/admit-funded-job';
 export * from './services/get-job-status';
 export * from './services/get-job-result';
+export * from './services/worker-callbacks';
 
 export * from './lib/hash-input';
 export * from './lib/errors';
