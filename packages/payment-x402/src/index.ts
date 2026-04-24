@@ -1,2 +1,2 @@
-// Cleared X402 Payment Adapter
-export const adapterName = 'x402';
+export * from './types';
+export * from './mock-x402-adapter';
