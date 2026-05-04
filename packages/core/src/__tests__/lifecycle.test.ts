@@ -4,7 +4,9 @@ import {
   getOrCreatePaymentIntent, 
   admitFundedJob, 
   handlePaidJobRequest,
-  handleWorkerCallback, 
+  startJob,
+  completeJob,
+  failJob,
   evaluateTimeouts,
   SystemClock,
   createJobTemplateId,
@@ -178,8 +180,8 @@ describe('Job Lifecycle', () => {
     const executionId = createExecutionId(randomUUID());
     await storage.saveAttempt({ id: executionId, jobId, status: 'DISPATCHED' as any, startedAt: clock.now() });
 
-    await handleWorkerCallback(
-      { jobId, executionId, status: 'SUCCESS', output: { result: 'first' } },
+    await completeJob(
+      { jobId, executionId, output: { result: 'first' } },
       storage, payments, clock
     );
 

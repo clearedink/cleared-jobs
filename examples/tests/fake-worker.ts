@@ -1,7 +1,8 @@
 import {
   ExecutionId,
-  handleWorkerCallback,
-  handleWorkerStart,
+  startJob,
+  completeJob,
+  failJob,
   IClockPort,
   IPaymentPort,
   IStoragePort,
@@ -20,16 +21,15 @@ export class CallbackClient {
     private clock: IClockPort
   ) {}
 
-  async startAttempt(executionId: ExecutionId) {
-    await handleWorkerStart(executionId, this.storage, this.clock);
+  async startAttempt(jobId: JobId, executionId: ExecutionId) {
+    await startJob({ jobId, executionId }, this.storage, this.clock);
   }
 
   async completeAttempt(jobId: JobId, executionId: ExecutionId, output: Record<string, any>) {
-    await handleWorkerCallback(
+    await completeJob(
       {
         jobId,
         executionId,
-        status: 'SUCCESS',
         output,
       },
       this.storage,
@@ -39,16 +39,13 @@ export class CallbackClient {
   }
 
   async failAttempt(jobId: JobId, executionId: ExecutionId, error: string) {
-    await handleWorkerCallback(
+    await failJob(
       {
         jobId,
         executionId,
-        status: 'FAILURE',
-        output: {},
         error,
       },
       this.storage,
-      this.payments,
       this.clock
     );
   }
@@ -62,7 +59,7 @@ export class FakeWorker {
    */
   async process(job: WorkerJob): Promise<void> {
     // 1. Mark as started
-    await this.client.startAttempt(job.executionId);
+    await this.client.startAttempt(job.jobId, job.executionId);
 
     // 2. Simulate processing delay
     const delay = job.inputs.sleep_ms || 1000;

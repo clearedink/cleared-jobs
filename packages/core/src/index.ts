@@ -16,9 +16,7 @@ export * from './use-cases/handle-paid-job-request';
 export * from './services/get-or-create-payment-intent';
 export * from './services/admit-funded-job';
 export * from './services/handle-paid-job-request';
-export * from './services/get-job-status';
-export * from './services/get-job-result';
-export * from './services/worker-callbacks';
+export * from './services/job-lifecycle';
 export * from './services/timeout-evaluator';
 export * from './services/operator-actions';
 
