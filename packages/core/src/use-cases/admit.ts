@@ -1,7 +1,7 @@
-import { QuoteId, JobId } from '../domain/ids';
+import { PaymentIntentId, JobId } from '../domain/ids';
 
 export interface AdmitFundedJobCommand {
-  quoteId: QuoteId;
+  paymentIntentId: PaymentIntentId;
   paymentIdentifier: string;
   paymentProof: string; // The cryptographic or rail-specific proof of payment
   inputs: Record<string, any>; // Re-submitted for structural verification

@@ -1,5 +1,5 @@
-import { AttemptStatus, EscrowState, JobStatus, QuoteStatus, ResolutionState } from './statuses';
-import { ExecutionId, JobId, JobTemplateId, PaymentId, QuoteId, ResolutionId } from './ids';
+import { AttemptStatus, EscrowState, JobStatus, PaymentIntentStatus, ResolutionState } from './statuses';
+import { ExecutionId, JobId, JobTemplateId, PaymentId, PaymentIntentId, ResolutionId } from './ids';
 
 export interface JobTemplate {
   id: JobTemplateId;
@@ -14,14 +14,14 @@ export interface JobTemplate {
   createdAt: Date;
 }
 
-export interface Quote {
-  id: QuoteId;
+export interface PaymentIntent {
+  id: PaymentIntentId;
   templateId: JobTemplateId;
   inputHash: string;
   inputs: Record<string, any>;
   priceAmount: bigint;
   priceCurrency: string;
-  status: QuoteStatus;
+  status: PaymentIntentStatus;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -32,7 +32,7 @@ export interface Quote {
  */
 export interface PaymentRecord {
   id: PaymentId;
-  quoteId: QuoteId;
+  paymentIntentId: PaymentIntentId;
   jobId?: JobId; // Linked once admitted
   paymentIdentifier: string; // The external reference (e.g. x402 address or transaction hash)
   amount: bigint;
@@ -78,7 +78,7 @@ export interface ResolutionRecord {
 
 export interface Job {
   id: JobId; // The canonical identity for all post-payment actions
-  quoteId: QuoteId;
+  paymentIntentId: PaymentIntentId;
   templateId: JobTemplateId;
   status: JobStatus;
   inputs: Record<string, any>;

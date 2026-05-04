@@ -3,7 +3,7 @@ import { IStoragePort } from '../ports/storage';
 import { IPaymentPort } from '../ports/payments';
 import { IClockPort } from '../ports/clock';
 import { AdmitFundedJobCommand, AdmitFundedJobResult } from '../use-cases/admit';
-import { EscrowState, JobStatus, QuoteStatus } from '../domain/statuses';
+import { EscrowState, JobStatus, PaymentIntentStatus } from '../domain/statuses';
 import { createJobId, createPaymentId } from '../domain/ids';
 import { hashInputs } from '../lib/hash-input';
 import {
@@ -22,21 +22,20 @@ export async function admitFundedJob(
   payments: IPaymentPort,
   clock: IClockPort
 ): Promise<AdmitFundedJobResult> {
-  // 1. Load the quote and validate
-  const quote = await storage.getQuote(command.quoteId);
-  if (!quote) {
-    throw new QuoteNotFoundError(command.quoteId);
+  // 1. Load the intent and validate
+  const intent = await storage.getPaymentIntent(command.paymentIntentId);
+  if (!intent) {
+    throw new QuoteNotFoundError(command.paymentIntentId as any); // TODO: Rename error
   }
 
-  if (quote.status === QuoteStatus.FUNDED) {
-    // If quote is already funded, we might be in a replay scenario checked below
-    // but just in case, we check status here too.
-  } else if (quote.status !== QuoteStatus.OPEN) {
-    throw new QuoteAlreadyFundedError(command.quoteId); // Or more generic status error
+  if (intent.status === PaymentIntentStatus.FUNDED) {
+    // Already funded
+  } else if (intent.status !== PaymentIntentStatus.OPEN) {
+    throw new QuoteAlreadyFundedError(command.paymentIntentId as any);
   }
 
-  if (quote.expiresAt < clock.now()) {
-    throw new QuoteExpiredError(command.quoteId);
+  if (intent.expiresAt < clock.now()) {
+    throw new QuoteExpiredError(command.paymentIntentId as any);
   }
 
   // 2. Verify payment proof through payment adapter
@@ -55,9 +54,8 @@ export async function admitFundedJob(
     const existingJob = await storage.getJobByPaymentIdentifier(command.paymentIdentifier);
 
     if (existingJob) {
-      // Logic request matching: check if input hash matches
       const currentInputHash = hashInputs(existingJob.templateId, command.inputs);
-      if (currentInputHash === quote.inputHash) {
+      if (currentInputHash === intent.inputHash) {
         return {
           jobId: existingJob.id,
           replayed: true,
@@ -70,12 +68,12 @@ export async function admitFundedJob(
     // 5. Create immutable payment record
     const paymentRecord: PaymentRecord = {
       id: createPaymentId(randomUUID()),
-      quoteId: quote.id,
+      paymentIntentId: intent.id,
       paymentIdentifier: command.paymentIdentifier,
-      amount: quote.priceAmount,
-      currency: quote.priceCurrency,
+      amount: intent.priceAmount,
+      currency: intent.priceCurrency,
       escrowState: EscrowState.HELD,
-      paymentRail: 'UNKNOWN', // Should be determined by payment adapter/verification
+      paymentRail: 'UNKNOWN',
       metadata: {
         paymentProof: command.paymentProof,
         verifiedAt: clock.now().toISOString(),
@@ -84,21 +82,21 @@ export async function admitFundedJob(
       updatedAt: clock.now(),
     };
 
-    // 6. Mark quote as funded
-    quote.status = QuoteStatus.FUNDED;
-    await storage.saveQuote(quote);
+    // 6. Mark intent as funded
+    intent.status = PaymentIntentStatus.FUNDED;
+    await storage.savePaymentIntent(intent);
 
     // 7. Create funded job
-    const template = await storage.getTemplate(quote.templateId);
+    const template = await storage.getTemplate(intent.templateId);
     const deadlineAt = new Date(clock.now().getTime() + (template?.slaSeconds || 60) * 1000);
     
     const jobId = createJobId(randomUUID());
     const job: Job = {
       id: jobId,
-      quoteId: quote.id,
-      templateId: quote.templateId,
+      paymentIntentId: intent.id,
+      templateId: intent.templateId,
       status: JobStatus.FUNDED,
-      inputs: quote.inputs,
+      inputs: intent.inputs,
       paymentIdentifier: command.paymentIdentifier,
       deadlineAt,
       createdAt: clock.now(),
@@ -129,7 +127,7 @@ export async function admitFundedJob(
       actor: 'SYSTEM',
       resourceType: 'JOB',
       resourceId: job.id,
-      payload: { quoteId: quote.id },
+      payload: { paymentIntentId: intent.id },
       metadata: {},
     });
 
@@ -140,7 +138,7 @@ export async function admitFundedJob(
       type: 'JOB_ADMITTED',
       aggregateId: job.id,
       jobId: job.id,
-      quoteId: quote.id,
+      paymentIntentId: intent.id,
     } as any);
 
     return {

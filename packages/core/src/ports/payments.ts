@@ -1,19 +1,16 @@
-import { Quote } from '../domain/models';
+import { PaymentIntent } from '../domain/models';
+import { PaymentIntentId } from '../domain/ids';
 
-export interface PaymentIntent {
-  paymentIdentifier: string; // The canonical identifier for this funding event
-  amount: bigint;
-  currency: string;
-  status: 'OPEN' | 'FUNDED' | 'EXPIRED';
+export interface PaymentIntentDetails {
+  paymentIdentifier: string;
   clientConfig: Record<string, any>;
 }
 
 export interface IPaymentPort {
   /**
-   * Initialize a payment for a specific quote.
-   * Returns the paymentIdentifier which will be used to admit the job.
+   * Generates a stable payment intent for a specific piece of work.
    */
-  createIntent(quote: Quote): Promise<PaymentIntent>;
+  createIntent(intent: PaymentIntent): Promise<PaymentIntentDetails>;
 
   /**
    * Verify a payment received from a rail.

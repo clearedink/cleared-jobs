@@ -1,21 +1,21 @@
-import { ExecutionAttempt, Job, JobResult, JobTemplate, PaymentRecord, Quote, ResolutionRecord } from '../domain/models';
+import { ExecutionAttempt, Job, JobResult, JobTemplate, PaymentRecord, PaymentIntent, ResolutionRecord } from '../domain/models';
 import { DomainEvent } from '../domain/events';
-import { ExecutionId, JobId, JobTemplateId, PaymentId, QuoteId, ResolutionId } from '../domain/ids';
+import { ExecutionId, JobId, JobTemplateId, PaymentId, PaymentIntentId, ResolutionId } from '../domain/ids';
 
 export interface IStoragePort {
   // Templates
   getTemplate(id: JobTemplateId): Promise<JobTemplate | null>;
   listTemplates(): Promise<JobTemplate[]>;
 
-  // Quotes
-  saveQuote(quote: Quote): Promise<void>;
-  getQuote(id: QuoteId): Promise<Quote | null>;
-  findQuoteByInputHash(templateId: JobTemplateId, inputHash: string): Promise<Quote | null>;
+  // Payment Intents
+  savePaymentIntent(intent: PaymentIntent): Promise<void>;
+  getPaymentIntent(id: PaymentIntentId): Promise<PaymentIntent | null>;
+  findPaymentIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<PaymentIntent | null>;
 
   // Payments
   savePayment(payment: PaymentRecord): Promise<void>;
   getPayment(id: PaymentId): Promise<PaymentRecord | null>;
-  getPaymentByQuoteId(quoteId: QuoteId): Promise<PaymentRecord | null>;
+  getPaymentByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<PaymentRecord | null>;
   getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null>;
   
   /**
@@ -26,7 +26,7 @@ export interface IStoragePort {
   // Jobs
   saveJob(job: Job): Promise<void>;
   getJob(id: JobId): Promise<Job | null>;
-  getJobByQuoteId(quoteId: QuoteId): Promise<Job | null>;
+  getJobByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<Job | null>;
   listActiveJobs(): Promise<Job[]>;
 
   // Results (Invariant 4: result retrievable independently)

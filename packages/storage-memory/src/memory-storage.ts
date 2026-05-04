@@ -9,8 +9,8 @@ import {
   JobTemplateId,
   PaymentId,
   PaymentRecord,
-  Quote,
-  QuoteId,
+  PaymentIntent,
+  PaymentIntentId,
   ResolutionId,
   ResolutionRecord,
   DomainEvent,
@@ -18,7 +18,7 @@ import {
 
 export class MemoryStorage implements IStoragePort {
   private templates = new Map<JobTemplateId, JobTemplate>();
-  private quotes = new Map<QuoteId, Quote>();
+  private paymentIntents = new Map<PaymentIntentId, PaymentIntent>();
   private payments = new Map<PaymentId, PaymentRecord>();
   private jobs = new Map<JobId, Job>();
   private attempts = new Map<ExecutionId, ExecutionAttempt>();
@@ -38,16 +38,16 @@ export class MemoryStorage implements IStoragePort {
     return Array.from(this.templates.values());
   }
 
-  async saveQuote(quote: Quote): Promise<void> {
-    this.quotes.set(quote.id, quote);
+  async savePaymentIntent(intent: PaymentIntent): Promise<void> {
+    this.paymentIntents.set(intent.id, intent);
   }
 
-  async getQuote(id: QuoteId): Promise<Quote | null> {
-    return this.quotes.get(id) || null;
+  async getPaymentIntent(id: PaymentIntentId): Promise<PaymentIntent | null> {
+    return this.paymentIntents.get(id) || null;
   }
 
-  async findQuoteByInputHash(templateId: JobTemplateId, inputHash: string): Promise<Quote | null> {
-    return Array.from(this.quotes.values()).find(
+  async findPaymentIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<PaymentIntent | null> {
+    return Array.from(this.paymentIntents.values()).find(
       q => q.templateId === templateId && q.inputHash === inputHash
     ) || null;
   }
@@ -60,8 +60,8 @@ export class MemoryStorage implements IStoragePort {
     return this.payments.get(id) || null;
   }
 
-  async getPaymentByQuoteId(quoteId: QuoteId): Promise<PaymentRecord | null> {
-    return Array.from(this.payments.values()).find(p => p.quoteId === quoteId) || null;
+  async getPaymentByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<PaymentRecord | null> {
+    return Array.from(this.payments.values()).find(p => p.paymentIntentId === paymentIntentId) || null;
   }
 
   async getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null> {
@@ -80,8 +80,8 @@ export class MemoryStorage implements IStoragePort {
     return this.jobs.get(id) || null;
   }
 
-  async getJobByQuoteId(quoteId: QuoteId): Promise<Job | null> {
-    return Array.from(this.jobs.values()).find(j => j.quoteId === quoteId) || null;
+  async getJobByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<Job | null> {
+    return Array.from(this.jobs.values()).find(j => j.paymentIntentId === paymentIntentId) || null;
   }
 
   async listActiveJobs(): Promise<Job[]> {

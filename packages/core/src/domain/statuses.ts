@@ -1,4 +1,4 @@
-export enum QuoteStatus {
+export enum PaymentIntentStatus {
   OPEN = 'OPEN',
   FUNDED = 'FUNDED',
   EXPIRED = 'EXPIRED',
