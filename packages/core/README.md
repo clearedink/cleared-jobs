@@ -40,18 +40,7 @@ export const cleared = createCleared({
 });
 ```
 
-In production, use a durable storage adapter instead of memory storage.
-
-```ts
-import { createCleared } from "@cleared/core";
-import { createPostgresStorage } from "@cleared/storage-postgres";
-
-export const cleared = createCleared({
-  storage: createPostgresStorage({
-    connectionString: process.env.DATABASE_URL!,
-  }),
-});
-```
+In production, use a durable storage adapter instead of memory storage (Production storage adapter planned).
 
 ---
 

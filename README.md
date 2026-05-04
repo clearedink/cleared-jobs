@@ -239,7 +239,7 @@ The repository includes demo scripts to exercise the durability model.
 
 Cleared is currently demo-oriented.
 
-- **Storage is not production-grade yet:** `storage-memory` is for local development and tests only.
+- **Storage is not production-grade yet:** `storage-memory` is for local development and tests only. Production storage adapter planned.
 - **Single-process admission is not enough for production:** Production deployments should use durable storage with database-level uniqueness constraints.
 - **No production scheduler yet:** Workers are triggered through simple callbacks in the demo. A production setup should use a persistent queue such as BullMQ, SQS, Cloud Tasks, or another durable worker system.
 - **x402 verification should come from official libraries:** Cleared should not replace official x402 payment libraries or facilitators.
