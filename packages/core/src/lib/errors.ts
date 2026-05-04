@@ -11,21 +11,21 @@ export class TemplateNotFoundError extends DomainError {
   }
 }
 
-export class QuoteNotFoundError extends DomainError {
-  constructor(quoteId: string) {
-    super(`Quote ${quoteId} not found`, 'QUOTE_NOT_FOUND');
+export class PaymentIntentNotFoundError extends DomainError {
+  constructor(id: string) {
+    super(`Payment intent ${id} not found`, 'PAYMENT_INTENT_NOT_FOUND');
   }
 }
 
-export class QuoteExpiredError extends DomainError {
-  constructor(quoteId: string) {
-    super(`Quote ${quoteId} has expired`, 'QUOTE_EXPIRED');
+export class PaymentIntentExpiredError extends DomainError {
+  constructor(id: string) {
+    super(`Payment intent ${id} has expired`, 'PAYMENT_INTENT_EXPIRED');
   }
 }
 
-export class QuoteAlreadyFundedError extends DomainError {
-  constructor(quoteId: string) {
-    super(`Quote ${quoteId} has already been funded`, 'QUOTE_ALREADY_FUNDED');
+export class PaymentIntentAlreadyFundedError extends DomainError {
+  constructor(id: string) {
+    super(`Payment intent ${id} has already been funded`, 'PAYMENT_INTENT_ALREADY_FUNDED');
   }
 }
 
@@ -48,7 +48,7 @@ export class ReplayConflictError extends DomainError {
 }
 
 export class JobAlreadyAdmittedError extends DomainError {
-  constructor(quoteId: string) {
-    super(`Job for quote ${quoteId} has already been admitted`, 'JOB_ALREADY_ADMITTED');
+  constructor(paymentIntentId: string) {
+    super(`Job for payment intent ${paymentIntentId} has already been admitted`, 'JOB_ALREADY_ADMITTED');
   }
 }

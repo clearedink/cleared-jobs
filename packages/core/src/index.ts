@@ -8,11 +8,11 @@ export * from './ports/payments';
 export * from './ports/workers';
 export * from './ports/clock';
 
-export * from './use-cases/quotes';
+export * from './use-cases/payment-intents';
 export * from './use-cases/admit';
 export * from './use-cases/jobs';
 
-export * from './services/create-quote';
+export * from './services/get-or-create-payment-intent';
 export * from './services/admit-funded-job';
 export * from './services/get-job-status';
 export * from './services/get-job-result';

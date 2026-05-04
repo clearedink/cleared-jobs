@@ -9,9 +9,9 @@ import { hashInputs } from '../lib/hash-input';
 import {
   InvalidPaymentProofError,
   PaymentIdentifierMismatchError,
-  QuoteAlreadyFundedError,
-  QuoteExpiredError,
-  QuoteNotFoundError,
+  PaymentIntentAlreadyFundedError,
+  PaymentIntentExpiredError,
+  PaymentIntentNotFoundError,
   ReplayConflictError,
 } from '../lib/errors';
 import { Job, PaymentRecord } from '../domain/models';
@@ -25,17 +25,17 @@ export async function admitFundedJob(
   // 1. Load the intent and validate
   const intent = await storage.getPaymentIntent(command.paymentIntentId);
   if (!intent) {
-    throw new QuoteNotFoundError(command.paymentIntentId as any); // TODO: Rename error
+    throw new PaymentIntentNotFoundError(command.paymentIntentId);
   }
 
   if (intent.status === PaymentIntentStatus.FUNDED) {
     // Already funded
   } else if (intent.status !== PaymentIntentStatus.OPEN) {
-    throw new QuoteAlreadyFundedError(command.paymentIntentId as any);
+    throw new PaymentIntentAlreadyFundedError(command.paymentIntentId);
   }
 
   if (intent.expiresAt < clock.now()) {
-    throw new QuoteExpiredError(command.paymentIntentId as any);
+    throw new PaymentIntentExpiredError(command.paymentIntentId);
   }
 
   // 2. Verify payment proof through payment adapter

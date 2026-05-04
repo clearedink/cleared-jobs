@@ -67,39 +67,30 @@ The core idea:
 Use `handlePaidJobRequest()` inside the endpoint that requires payment.
 
 ```typescript
-const result = await cleared.handlePaidJobRequest({
-  idempotencyKey: req.header("Idempotency-Key"),
-
-  buyerKey: req.body.agentId,
-  jobType: "quest_submission",
-  inputHash,
-
-  price: {
-    amount: "0.05",
-    currency: "USDC",
-    network: "solana-devnet",
-  },
-
-  payload: {
-    questId,
-    agentId,
-    submissionUrl,
-  },
-
-  payment: req.x402?.payment,
-
-  enqueue: async ({ jobId }) => {
-    await queue.add("quest_submission", { jobId });
-  },
-});
-
-if (result.type === "payment_required") {
-  return res.status(402).json(result.paymentRequirement);
+// 1. Get or Create Intent
+if (!req.body.payment_proof) {
+  const intent = await cleared.getOrCreatePaymentIntent({
+    idempotencyKey: req.header("Idempotency-Key"),
+    buyerKey: req.body.agentId,
+    jobType: "quest_submission",
+    inputHash,
+    price: { amount: "1000000", currency: "USDC" },
+    payload: { questId, agentId, submissionUrl },
+  });
+  return res.status(402).json(intent.paymentRequirement);
 }
+
+// 2. Admit Job
+const result = await cleared.admitFundedJob({
+  paymentIntentId: req.body.payment_intent_id,
+  paymentIdentifier: req.body.payment_identifier,
+  paymentProof: req.body.payment_proof,
+  inputs: { questId, agentId, submissionUrl },
+});
 
 return res.status(202).json({
   jobId: result.jobId,
-  status: result.status,
+  status: "ACCEPTED",
   resultUrl: `/jobs/${result.jobId}/result`,
 });
 ```
@@ -167,7 +158,7 @@ app.get("/jobs/:jobId/result", async (req, res) => {
 
 | Function                 | Purpose                                                                                                             |
 | :----------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| `handlePaidJobRequest()` | Main paid-route helper. Creates or reuses a payment intent before payment and admits one durable job after payment. |
+| `getOrCreatePaymentIntent()` | Main paid-route helper. Creates or reuses a stable payment intent before payment. |
 | `admitFundedJob()`       | Lower-level helper for admitting a job after an x402 payment has already been verified.                             |
 | `startJob()`             | Marks a job as running.                                                                                             |
 | `completeJob()`          | Marks a job as completed and stores the result.                                                                     |

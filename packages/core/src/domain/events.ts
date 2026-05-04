@@ -1,9 +1,9 @@
-import { JobId, QuoteId, PaymentId, ExecutionId, ResolutionId } from './ids';
-import { JobStatus, QuoteStatus, EscrowState, ResolutionState } from './statuses';
+import { JobId, PaymentIntentId, PaymentId, ExecutionId, ResolutionId } from './ids';
+import { JobStatus, PaymentIntentStatus, EscrowState, ResolutionState } from './statuses';
 
 export type DomainEventType =
-  | 'QUOTE_CREATED'
-  | 'QUOTE_FUNDED'
+  | 'PAYMENT_INTENT_CREATED'
+  | 'PAYMENT_INTENT_FUNDED'
   | 'JOB_ADMITTED'
   | 'JOB_DISPATCHED'
   | 'JOB_STARTED'
@@ -22,9 +22,9 @@ export interface BaseEvent {
   aggregateId: string;
 }
 
-export interface QuoteCreatedEvent extends BaseEvent {
-  type: 'QUOTE_CREATED';
-  quoteId: QuoteId;
+export interface PaymentIntentCreatedEvent extends BaseEvent {
+  type: 'PAYMENT_INTENT_CREATED';
+  paymentIntentId: PaymentIntentId;
 }
 
 export interface JobAdmittedEvent extends BaseEvent {
@@ -53,7 +53,7 @@ export interface OperatorActionEvent extends BaseEvent {
 }
 
 export type DomainEvent =
-  | QuoteCreatedEvent
+  | PaymentIntentCreatedEvent
   | JobAdmittedEvent
   | JobCompletedEvent
   | EscrowReleasedEvent
@@ -64,7 +64,7 @@ export interface AuditLogEntry {
   timestamp: Date;
   action: string;
   actor: string; // 'SYSTEM', 'WORKER', or operator ID
-  resourceType: 'JOB' | 'QUOTE' | 'PAYMENT' | 'RESOLUTION';
+  resourceType: 'JOB' | 'PAYMENT_INTENT' | 'PAYMENT' | 'RESOLUTION';
   resourceId: string;
   payload: Record<string, any>;
   metadata: {
