@@ -1,64 +1,80 @@
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
 import {
-  HandlePaidJobRequestCommand,
+  HandlePaidJobRequestInput,
   HandlePaidJobRequestResult
 } from '../use-cases/handle-paid-job-request';
 import { getOrCreateJobIntent } from './get-or-create-job-intent';
 import { admitPaidJob } from './admit-paid-job';
-import { JobStatus, JobIntentStatus } from '../domain/statuses';
+import { MissingIdempotencyKeyError } from '../lib/errors';
+
+export type PaymentRequirementGenerator = (intentId: string) => Promise<unknown>;
 
 export async function handlePaidJobRequest(
-  command: HandlePaidJobRequestCommand,
+  input: HandlePaidJobRequestInput,
   storage: IStoragePort,
-  clock: IClockPort
+  clock: IClockPort,
+  generateRequirement?: PaymentRequirementGenerator
 ): Promise<HandlePaidJobRequestResult> {
+  if (!input.idempotencyKey) {
+    throw new MissingIdempotencyKeyError();
+  }
+
+  // 1. Ensure a stable payment intent exists
   const intentResult = await getOrCreateJobIntent(
     {
-      idempotencyKey: command.idempotencyKey,
-      buyerKey: command.buyerKey,
-      jobType: command.jobType,
-      inputHash: command.inputHash,
-      price: command.price,
-      payload: command.payload,
-      paymentRequirement: command.paymentRequirement,
+      idempotencyKey: input.idempotencyKey,
+      buyerKey: input.buyerKey,
+      jobType: input.jobType,
+      inputHash: input.inputHash,
+      price: input.price,
+      payload: input.payload,
     },
     storage,
     clock
   );
 
-  if (!command.verifiedPayment) {
+  // 2. If no payment provided, return payment requirement
+  if (!input.payment) {
+    let requirement = intentResult.paymentRequirement;
+    if (!requirement && generateRequirement) {
+      requirement = await generateRequirement(intentResult.jobIntentId);
+    }
+
     return {
       type: 'payment_required',
-      jobIntentId: intentResult.jobIntentId,
-      paymentRequirement: intentResult.paymentRequirement,
-      status: JobIntentStatus.OPEN,
-      expiresAt: intentResult.expiresAt,
-      price: intentResult.price,
+      intentId: intentResult.jobIntentId,
+      paymentRequirement: requirement,
+      status: intentResult.status,
     };
   }
 
+  // 3. Payment provided -> Admit Job
   const admission = await admitPaidJob(
     {
-      jobIntentId: intentResult.jobIntentId,
-      paymentIdentifier: command.verifiedPayment.paymentIdentifier,
-      amount: command.verifiedPayment.amount,
-      currency: command.verifiedPayment.currency,
-      paymentMetadata: command.verifiedPayment.metadata,
-      inputs: command.payload,
+      intentId: intentResult.jobIntentId,
+      paymentId: input.payment.paymentId,
+      payer: input.payment.payer,
+      payTo: input.payment.payTo,
+      amount: input.payment.amount,
+      currency: input.payment.currency,
+      network: input.payment.network,
+      txHash: input.payment.txHash,
+      jobType: input.jobType,
+      inputHash: input.inputHash,
+      payload: input.payload,
+      enqueue: input.enqueue,
+      metadata: input.metadata,
     },
     storage,
     clock
   );
 
-  if (!admission.replayed && command.enqueue) {
-    await command.enqueue({ jobId: admission.jobId });
-  }
-
   return {
-    type: admission.replayed ? 'already_accepted' : 'accepted',
-    jobIntentId: intentResult.jobIntentId,
+    type: admission.type,
+    intentId: intentResult.jobIntentId,
     jobId: admission.jobId,
-    status: JobStatus.ADMITTED,
+    status: admission.status,
+    paymentId: admission.paymentId,
   };
 }

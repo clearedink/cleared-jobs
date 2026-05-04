@@ -1,77 +1,55 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
-import { 
-  GetOrCreateJobIntentCommand, 
-  GetOrCreateJobIntentResult 
-} from '../use-cases/job-intents';
-import { JobIntentStatus } from '../domain/statuses';
+import { GetOrCreateJobIntentInput } from '../use-cases/job-intents';
+import { JobIntentRecord } from '../domain/models';
 import { createJobIntentId } from '../domain/ids';
-import { TemplateNotFoundError } from '../lib/errors';
-import { JobIntent } from '../domain/models';
+import { IdempotencyConflictError } from '../lib/errors';
 
 export async function getOrCreateJobIntent(
-  command: GetOrCreateJobIntentCommand,
+  input: GetOrCreateJobIntentInput,
   storage: IStoragePort,
   clock: IClockPort
-): Promise<GetOrCreateJobIntentResult> {
-  const template = await storage.getTemplateByJobType(command.jobType);
-  if (!template) {
-    throw new TemplateNotFoundError(command.jobType);
-  }
-
-  const existingIntent = await storage.findJobIntentByInputHash(template.id, command.inputHash);
+): Promise<JobIntentRecord> {
+  const existingIntent = await storage.findJobIntentByIdempotencyKey(input.buyerKey, input.idempotencyKey);
   
   if (existingIntent) {
-    if (existingIntent.expiresAt > clock.now()) {
-      return {
-        jobIntentId: existingIntent.id,
-        paymentRequirement: existingIntent.paymentRequirement,
-        price: {
-          amount: existingIntent.priceAmount.toString(),
-          currency: existingIntent.priceCurrency,
-        },
-        expiresAt: existingIntent.expiresAt,
-      };
+    if (existingIntent.inputHash !== input.inputHash) {
+      throw new IdempotencyConflictError(existingIntent.inputHash, input.inputHash);
     }
+    return existingIntent;
   }
 
   const intentId = createJobIntentId(randomUUID());
-  const expiresAt = new Date(clock.now().getTime() + 3600 * 1000); // 1 hour default
+  const now = clock.now().toISOString();
 
-  const intent: JobIntent = {
-    id: intentId,
-    templateId: template.id,
-    inputHash: command.inputHash,
-    inputs: command.payload,
-    priceAmount: template.priceAmount,
-    priceCurrency: template.priceCurrency,
-    paymentRequirement: command.paymentRequirement,
-    status: JobIntentStatus.OPEN,
-    expiresAt,
-    createdAt: clock.now(),
+  const intent: JobIntentRecord = {
+    intentId,
+    idempotencyKey: input.idempotencyKey,
+    buyerKey: input.buyerKey,
+    jobType: input.jobType,
+    inputHash: input.inputHash,
+    price: input.price,
+    payload: input.payload,
+    status: 'requires_payment', // Using README status
+    createdAt: now,
+    updatedAt: now,
+    expiresAt: input.expiresAt,
+    metadata: input.metadata,
   };
 
   await storage.saveJobIntent(intent);
 
   await storage.saveAuditLog({
     id: randomUUID(),
-    timestamp: clock.now(),
+    timestamp: new Date(now),
     action: 'JOB_INTENT_CREATED',
     actor: 'SYSTEM',
-    resourceType: 'JOB_INTENT' as any,
+    resourceType: 'JOB_INTENT',
     resourceId: intentId,
-    payload: { jobType: command.jobType, idempotencyKey: command.idempotencyKey },
+    payload: { jobType: input.jobType, idempotencyKey: input.idempotencyKey },
     metadata: {},
   });
 
-  return {
-    jobIntentId: intentId,
-    paymentRequirement: command.paymentRequirement,
-    price: {
-      amount: template.priceAmount.toString(),
-      currency: template.priceCurrency,
-    },
-    expiresAt,
-  };
+  return intent;
 }

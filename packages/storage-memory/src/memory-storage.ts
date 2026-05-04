@@ -2,14 +2,12 @@ import {
   ExecutionAttempt,
   ExecutionId,
   IStoragePort,
-  Job,
+  JobRecord,
   JobId,
   JobResult,
   JobTemplate,
   JobTemplateId,
-  PaymentId,
-  PaymentRecord,
-  JobIntent,
+  JobIntentRecord,
   JobIntentId,
   ResolutionId,
   ResolutionRecord,
@@ -18,16 +16,14 @@ import {
 
 export class MemoryStorage implements IStoragePort {
   private templates = new Map<JobTemplateId, JobTemplate>();
-  private jobIntents = new Map<JobIntentId, JobIntent>();
-  private payments = new Map<PaymentId, PaymentRecord>();
-  private jobs = new Map<JobId, Job>();
+  private jobIntents = new Map<JobIntentId, JobIntentRecord>();
+  private jobs = new Map<JobId, JobRecord>();
   private attempts = new Map<ExecutionId, ExecutionAttempt>();
   private results = new Map<JobId, JobResult>();
   private resolutions = new Map<ResolutionId, ResolutionRecord>();
   private domainEvents: DomainEvent[] = [];
   private auditLogs: any[] = [];
 
-  // Simple admission lock for single-process local dev
   private admissionLocks = new Set<string>();
 
   async getTemplate(id: JobTemplateId): Promise<JobTemplate | null> {
@@ -42,59 +38,43 @@ export class MemoryStorage implements IStoragePort {
     return Array.from(this.templates.values());
   }
 
-  async saveJobIntent(intent: JobIntent): Promise<void> {
-    this.jobIntents.set(intent.id, intent);
+  async saveJobIntent(intent: JobIntentRecord): Promise<void> {
+    this.jobIntents.set(intent.intentId as any, intent);
   }
 
-  async getJobIntent(id: JobIntentId): Promise<JobIntent | null> {
+  async getJobIntent(id: JobIntentId): Promise<JobIntentRecord | null> {
     return this.jobIntents.get(id) || null;
   }
 
-  async findJobIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<JobIntent | null> {
+  async findJobIntentByIdempotencyKey(buyerKey: string, idempotencyKey: string): Promise<JobIntentRecord | null> {
     return Array.from(this.jobIntents.values()).find(
-      q => q.templateId === templateId && q.inputHash === inputHash
+      q => q.buyerKey === buyerKey && q.idempotencyKey === idempotencyKey
     ) || null;
   }
 
-  async savePayment(payment: PaymentRecord): Promise<void> {
-    this.payments.set(payment.id, payment);
+  async getJobByPaymentId(network: string, paymentId: string): Promise<JobRecord | null> {
+    return Array.from(this.jobs.values()).find(j => j.network === network && j.paymentId === paymentId) || null;
   }
 
-  async getPayment(id: PaymentId): Promise<PaymentRecord | null> {
-    return this.payments.get(id) || null;
+  async saveJob(job: JobRecord): Promise<void> {
+    this.jobs.set(job.jobId as any, job);
   }
 
-  async getPaymentByJobIntentId(jobIntentId: JobIntentId): Promise<PaymentRecord | null> {
-    return Array.from(this.payments.values()).find(p => p.jobIntentId === jobIntentId) || null;
-  }
-
-  async getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null> {
-    return Array.from(this.payments.values()).find(p => p.paymentIdentifier === paymentIdentifier) || null;
-  }
-
-  async getJobByPaymentIdentifier(paymentIdentifier: string): Promise<Job | null> {
-    return Array.from(this.jobs.values()).find(j => j.paymentIdentifier === paymentIdentifier) || null;
-  }
-
-  async saveJob(job: Job): Promise<void> {
-    this.jobs.set(job.id, job);
-  }
-
-  async getJob(id: JobId): Promise<Job | null> {
+  async getJob(id: JobId): Promise<JobRecord | null> {
     return this.jobs.get(id) || null;
   }
 
-  async getJobByJobIntentId(jobIntentId: JobIntentId): Promise<Job | null> {
-    return Array.from(this.jobs.values()).find(j => j.jobIntentId === jobIntentId) || null;
+  async getJobByJobIntentId(jobIntentId: JobIntentId): Promise<JobRecord | null> {
+    return Array.from(this.jobs.values()).find(j => j.intentId === jobIntentId) || null;
   }
 
-  async listActiveJobs(): Promise<Job[]> {
+  async listActiveJobs(): Promise<JobRecord[]> {
     const terminalStatuses = ['completed', 'failed', 'cancelled'];
     return Array.from(this.jobs.values()).filter(j => !terminalStatuses.includes(j.status));
   }
 
   async saveResult(result: JobResult): Promise<void> {
-    this.results.set(result.jobId, result);
+    this.results.set(result.jobId as any, result);
   }
 
   async getResult(jobId: JobId): Promise<JobResult | null> {
@@ -137,9 +117,6 @@ export class MemoryStorage implements IStoragePort {
     this.auditLogs.push(entry);
   }
 
-  /**
-   * Atomic operation wrapper for job admission
-   */
   async withPaymentIdentifierLock<T>(
     paymentIdentifier: string,
     operation: () => Promise<T>
@@ -155,9 +132,6 @@ export class MemoryStorage implements IStoragePort {
     }
   }
 
-  /**
-   * Simple admission lock implementation for local dev
-   */
   private async acquireAdmissionLock(paymentIdentifier: string): Promise<boolean> {
     if (this.admissionLocks.has(paymentIdentifier)) {
       return false;
@@ -170,7 +144,6 @@ export class MemoryStorage implements IStoragePort {
     this.admissionLocks.delete(paymentIdentifier);
   }
 
-  // Pre-seed helper for dev
   async seedTemplates(templates: JobTemplate[]) {
     templates.forEach(t => this.templates.set(t.id, t));
   }

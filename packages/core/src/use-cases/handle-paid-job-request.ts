@@ -1,56 +1,33 @@
 import { JobStatus, JobIntentStatus } from '../domain/statuses';
-import { JobId, JobIntentId } from '../domain/ids';
-import { PaymentRequirement } from '../domain/models';
+import { JobPrice, VerifiedX402Payment, EnqueueArgs } from '../domain/models';
 
-export interface HandlePaidJobRequestCommand {
+export type HandlePaidJobRequestInput = {
   idempotencyKey: string;
   buyerKey: string;
   jobType: string;
   inputHash: string;
-  price: {
-    amount: string;
-    currency: string;
-  };
-  payload: Record<string, any>;
-  
-  /**
-   * Provided by the application layer.
-   */
-  paymentRequirement: PaymentRequirement;
-
-  /**
-   * If provided, it means the application layer has already verified the payment.
-   */
-  verifiedPayment?: {
-    paymentIdentifier: string;
-    amount: bigint;
-    currency: string;
-    metadata?: Record<string, any>;
-  };
-
-  enqueue?: (args: { jobId: JobId }) => Promise<void>;
-  metadata?: Record<string, any>;
-}
+  price: JobPrice;
+  payload: Record<string, unknown>;
+  payment?: VerifiedX402Payment;
+  enqueue?: (args: EnqueueArgs) => Promise<void>;
+  metadata?: Record<string, unknown>;
+};
 
 export type HandlePaidJobRequestResult =
   | JobIntentRequiredResult
   | PaidJobAcceptedResult;
 
-export interface JobIntentRequiredResult {
+export type JobIntentRequiredResult = {
   type: 'payment_required';
-  jobIntentId: JobIntentId;
-  paymentRequirement: PaymentRequirement;
+  intentId: string;
+  paymentRequirement: unknown;
   status: JobIntentStatus;
-  expiresAt: Date;
-  price: {
-    amount: string;
-    currency: string;
-  };
-}
+};
 
-export interface PaidJobAcceptedResult {
+export type PaidJobAcceptedResult = {
   type: 'accepted' | 'already_accepted';
-  jobIntentId: JobIntentId;
-  jobId: JobId;
+  intentId: string;
+  jobId: string;
   status: JobStatus;
-}
+  paymentId: string;
+};

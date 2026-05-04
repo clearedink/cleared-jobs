@@ -1,42 +1,44 @@
-export enum JobIntentStatus {
-  OPEN = 'open',
-  FUNDED = 'funded',
-  EXPIRED = 'expired',
-  CANCELLED = 'cancelled',
-}
+export type JobIntentStatus =
+  | 'requires_payment'
+  | 'paid'
+  | 'expired'
+  | 'cancelled';
 
-export enum JobStatus {
-  ADMITTED = 'admitted',
-  QUEUED = 'queued',
-  RUNNING = 'running',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  MANUAL_REVIEW = 'manual_review',
-  REFUND_DUE = 'refund_due',
-}
+export type JobStatus =
+  | 'admitted'
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'manual_review'
+  | 'refund_due';
 
-export enum EscrowState {
-  NOT_FUNDED = 'not_funded',
-  HELD = 'held',
-  RELEASE_PENDING = 'release_pending',
-  RELEASED = 'released',
-  REFUND_PENDING = 'refund_pending',
-  REFUNDED = 'refunded',
-}
+export type JobFailureResolution =
+  | 'retryable'
+  | 'manual_review'
+  | 'refund_due'
+  | 'terminal_failed';
 
-export enum ResolutionState {
-  PENDING = 'pending',
-  SUCCESS = 'success',
-  REFUND_PENDING = 'refund_pending',
-  REFUNDED = 'refunded',
-  MANUAL_REVIEW = 'manual_review',
-}
+// Kept for internal engine state if needed
+export type EscrowState =
+  | 'not_funded'
+  | 'held'
+  | 'release_pending'
+  | 'released'
+  | 'refund_pending'
+  | 'refunded';
 
-export enum AttemptStatus {
-  QUEUED = 'queued',
-  RUNNING = 'running',
-  SUCCEEDED = 'succeeded',
-  FAILED = 'failed',
-  TIMED_OUT = 'timed_out',
-  ABORTED = 'aborted',
-}
+export type ResolutionState =
+  | 'pending'
+  | 'success'
+  | 'refund_pending'
+  | 'refunded'
+  | 'manual_review';
+
+export type AttemptStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'timed_out'
+  | 'aborted';

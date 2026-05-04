@@ -1,6 +1,6 @@
-import { ExecutionAttempt, Job, JobResult, JobTemplate, PaymentRecord, JobIntent, ResolutionRecord } from '../domain/models';
+import { ExecutionAttempt, JobRecord, JobResult, JobTemplate, JobIntentRecord, ResolutionRecord } from '../domain/models';
 import { DomainEvent } from '../domain/events';
-import { ExecutionId, JobId, JobTemplateId, PaymentId, JobIntentId, ResolutionId } from '../domain/ids';
+import { ExecutionId, JobId, JobTemplateId, JobIntentId, ResolutionId } from '../domain/ids';
 
 export interface IStoragePort {
   // Templates
@@ -10,32 +10,22 @@ export interface IStoragePort {
   listTemplates(): Promise<JobTemplate[]>;
 
   // Job Intents
-  saveJobIntent(intent: JobIntent): Promise<void>;
-  getJobIntent(id: JobIntentId): Promise<JobIntent | null>;
-  findJobIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<JobIntent | null>;
-
-  // Payments
-  savePayment(payment: PaymentRecord): Promise<void>;
-  getPayment(id: PaymentId): Promise<PaymentRecord | null>;
-  getPaymentByJobIntentId(jobIntentId: JobIntentId): Promise<PaymentRecord | null>;
-  getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null>;
-  
-  /**
-   * Enforces invariant 1: one paymentIdentifier admits at most one job
-   */
-  getJobByPaymentIdentifier(paymentIdentifier: string): Promise<Job | null>;
+  saveJobIntent(intent: JobIntentRecord): Promise<void>;
+  getJobIntent(id: JobIntentId): Promise<JobIntentRecord | null>;
+  findJobIntentByIdempotencyKey(buyerKey: string, idempotencyKey: string): Promise<JobIntentRecord | null>;
 
   // Jobs
-  saveJob(job: Job): Promise<void>;
-  getJob(id: JobId): Promise<Job | null>;
-  getJobByJobIntentId(jobIntentId: JobIntentId): Promise<Job | null>;
-  listActiveJobs(): Promise<Job[]>;
+  saveJob(job: JobRecord): Promise<void>;
+  getJob(id: JobId): Promise<JobRecord | null>;
+  getJobByJobIntentId(jobIntentId: JobIntentId): Promise<JobRecord | null>;
+  getJobByPaymentId(network: string, paymentId: string): Promise<JobRecord | null>;
+  listActiveJobs(): Promise<JobRecord[]>;
 
-  // Results (Invariant 4: result retrievable independently)
+  // Results
   saveResult(result: JobResult): Promise<void>;
   getResult(jobId: JobId): Promise<JobResult | null>;
 
-  // Resolutions (Invariant 5: financial resolution queryable independently)
+  // Resolutions
   saveResolution(resolution: ResolutionRecord): Promise<void>;
   getResolution(id: ResolutionId): Promise<ResolutionRecord | null>;
   getResolutionByJobId(jobId: JobId): Promise<ResolutionRecord | null>;
@@ -49,7 +39,7 @@ export interface IStoragePort {
   saveDomainEvent(event: DomainEvent): Promise<void>;
   listDomainEventsByAggregateId(aggregateId: string): Promise<DomainEvent[]>;
 
-  // Audit (Invariant 6: log every action)
+  // Audit
   saveAuditLog(entry: any): Promise<void>;
 
   /**

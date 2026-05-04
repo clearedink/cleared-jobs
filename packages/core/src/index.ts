@@ -1,3 +1,4 @@
+export * from './client';
 export * from './domain/ids';
 export * from './domain/statuses';
 export * from './domain/models';

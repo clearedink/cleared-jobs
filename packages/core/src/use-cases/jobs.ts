@@ -1,42 +1,19 @@
-import { JobId, ExecutionId } from '../domain/ids';
-import { JobStatus } from '../domain/statuses';
-import { JobResult } from '../domain/models';
+import { JobFailureResolution } from '../domain/statuses';
 
-export interface GetJobStatusQuery {
-  jobId: JobId;
-}
-
-export interface GetJobStatusResult {
-  jobId: JobId;
-  status: JobStatus;
-}
-
-export interface GetJobResultQuery {
-  jobId: JobId;
-}
-
-export interface GetJobResultResult {
-  jobId: JobId;
-  result?: JobResult;
-}
-
-export interface StartJobCommand {
-  jobId: JobId;
-  executionId?: ExecutionId;
+export type StartJobInput = {
   workerId?: string;
-  metadata?: Record<string, any>;
-}
+  metadata?: Record<string, unknown>;
+};
 
-export interface CompleteJobCommand {
-  jobId: JobId;
-  executionId?: ExecutionId;
-  output: Record<string, any>;
-  metadata?: Record<string, any>;
-}
+export type CompleteJobInput = {
+  result: Record<string, unknown>;
+  resultType?: string;
+  metadata?: Record<string, unknown>;
+};
 
-export interface FailJobCommand {
-  jobId: JobId;
-  executionId?: ExecutionId;
-  error: string;
-  metadata?: Record<string, any>;
-}
+export type FailJobInput = {
+  reason: string;
+  resolution: JobFailureResolution;
+  errorCode?: string;
+  metadata?: Record<string, unknown>;
+};

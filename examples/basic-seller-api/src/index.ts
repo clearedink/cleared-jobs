@@ -1,23 +1,13 @@
 import express from 'express';
 import { randomUUID } from 'crypto';
 import { 
-  handlePaidJobRequest, 
-  getJob, 
-  getResult,
+  createCleared,
   SystemClock,
   createJobTemplateId,
-  createJobId,
   hashInputs,
-  dispatchJob
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
 import { MockX402Adapter } from '@cleared/payment-x402';
-
-/**
- * -----------------------------------------------------------------------------
- * HTTP HELPERS
- * -----------------------------------------------------------------------------
- */
 
 function sendPaymentRequired(res: express.Response, result: any) {
   return res.status(402).json({
@@ -76,20 +66,10 @@ const payments = new MockX402Adapter({
   asset: 'USDC'
 });
 
+const cleared = createCleared({ storage, clock });
+
 const callbackClient = new CallbackClient(storage, clock);
 const fakeWorker = new FakeWorker(callbackClient);
-
-const workerPort = {
-  dispatch: async (job: any) => {
-    console.log(`[Demo] Dispatching job ${job.id} to fake worker...`);
-    fakeWorker.process(job).catch(err => {
-      console.error(`[Demo] Worker error for job ${job.id}:`, err);
-    });
-  },
-  cancel: async (jobId: any) => {
-    console.log(`[Demo] Cancelled job ${jobId}`);
-  }
-};
 
 const JOB_TYPE = 'tmpl_batch_enrichment_v1';
 const TEMPLATE_ID = createJobTemplateId(JOB_TYPE);
@@ -107,58 +87,60 @@ storage.seedTemplates([{
   createdAt: clock.now()
 }]);
 
-/**
- * Main entry point: POST /v1/jobs/run
- */
 app.post('/v1/jobs/run', async (req, res, next) => {
   const { payment_proof, payment_identifier, inputs, idempotency_key } = req.body;
 
   try {
     const inputHash = hashInputs(JOB_TYPE, inputs || {});
     
-    // 1. Generate a payment requirement (using mock adapter)
-    const requirement = await payments.createIntent({
-      id: idempotency_key || randomUUID(),
-      priceAmount: 1000000n,
-      priceCurrency: 'USDC'
-    } as any);
-
-    // 2. If a payment proof was provided, verify it first
-    let verifiedPayment = undefined;
+    let payment = undefined;
     if (payment_proof) {
       const verification = await payments.verifyProof(payment_proof);
       if (verification.verified) {
-        verifiedPayment = {
-          paymentIdentifier: verification.paymentIdentifier,
-          amount: verification.amount,
-          currency: verification.currency,
-          metadata: { source: 'seller-api-verification' }
+        payment = {
+          paymentId: verification.paymentIdentifier,
+          payer: '0xBuyer',
+          amount: verification.amount.toString(),
+          currency: verification.currency as 'USDC',
+          network: 'test',
         };
       } else {
         return sendError(res, 400, 'INVALID_PAYMENT_PROOF', 'The provided payment proof is invalid.');
       }
     }
 
-    // 3. Call the headline API with pre-verified data
-    const result = await handlePaidJobRequest(
+    const result = await cleared.handlePaidJobRequest(
       {
         idempotencyKey: idempotency_key || randomUUID(),
         buyerKey: 'demo-user-123',
         jobType: JOB_TYPE,
         inputHash,
-        price: { amount: '1000000', currency: 'USDC' },
+        price: { amount: '1', currency: 'USDC', network: 'test' },
         payload: inputs || {},
-        paymentRequirement: {
-          paymentIdentifier: requirement.paymentIdentifier,
-          clientConfig: requirement.clientConfig
-        },
-        verifiedPayment,
+        payment,
         enqueue: async ({ jobId }) => {
-          await dispatchJob(jobId, storage, workerPort, clock);
+          console.log(`[Demo] Dispatching job ${jobId} to fake worker...`);
+          // simulate async dispatch
+          setTimeout(() => {
+            cleared.getJob(jobId).then(job => {
+              if (job) {
+                fakeWorker.process({ id: job.jobId, inputs: job.payload, executionId: randomUUID() } as any).catch(console.error);
+              }
+            });
+          }, 0);
         }
       },
       storage,
-      clock
+      clock,
+      async (intentId) => {
+        // Generate requirement dynamically
+        const req = await payments.createIntent({
+          id: idempotency_key || randomUUID(),
+          priceAmount: 1000000n,
+          priceCurrency: 'USDC'
+        } as any);
+        return req;
+      }
     );
 
     if (result.type === 'payment_required') {
@@ -174,8 +156,7 @@ app.post('/v1/jobs/run', async (req, res, next) => {
 
 app.get('/v1/jobs/:jobId', async (req, res, next) => {
   try {
-    const jobId = createJobId(req.params.jobId);
-    const status = await getJob({ jobId }, storage);
+    const status = await cleared.getJob(req.params.jobId);
     res.json(status);
   } catch (err) {
     next(err);
@@ -184,10 +165,9 @@ app.get('/v1/jobs/:jobId', async (req, res, next) => {
 
 app.get('/v1/jobs/:jobId/result', async (req, res, next) => {
   try {
-    const jobId = createJobId(req.params.jobId);
-    const resultResponse = await getResult({ jobId }, storage);
+    const resultResponse = await cleared.getResult(req.params.jobId);
     
-    if (!resultResponse.result) {
+    if (!resultResponse || !resultResponse.result) {
       return sendError(res, 404, 'RESULT_NOT_READY', 'Job result is not ready yet');
     }
 

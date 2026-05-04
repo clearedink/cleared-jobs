@@ -1,263 +1,169 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
-import { IWorkerPort } from '../ports/workers';
 import { IClockPort } from '../ports/clock';
-import { JobId, createExecutionId, createResolutionId } from '../ids';
-import { AttemptStatus, EscrowState, JobStatus, ResolutionState } from '../domain/statuses';
-import { ExecutionAttempt, JobResult, ResolutionRecord } from '../domain/models';
+import { JobRecord, JobResult } from '../domain/models';
 import { 
-  StartJobCommand, 
-  CompleteJobCommand, 
-  FailJobCommand, 
-  GetJobStatusQuery, 
-  GetJobStatusResult, 
-  GetJobResultQuery, 
-  GetJobResultResult 
+  StartJobInput, 
+  CompleteJobInput, 
+  FailJobInput, 
 } from '../use-cases/jobs';
+import { InvalidJobTransitionError, JobNotFoundError } from '../lib/errors';
 
-/**
- * Dispatch a job to a worker and record the initial attempt
- */
-export async function dispatchJob(
-  jobId: JobId,
+export async function startJob(
+  jobId: string,
+  input: StartJobInput | undefined,
   storage: IStoragePort,
-  workers: IWorkerPort,
   clock: IClockPort
-): Promise<void> {
-  const job = await storage.getJob(jobId);
-  if (!job) throw new Error(`Job ${jobId} not found`);
+): Promise<JobRecord> {
+  const job = await storage.getJob(jobId as any);
+  if (!job) throw new JobNotFoundError(jobId);
 
-  const executionId = createExecutionId(randomUUID());
+  // Status transitions
+  // admitted/queued → running
+  // running        → running
+  // completed      → completed
+  // failed         → failed
+  // manual_review  → manual_review
+  // refund_due     → refund_due
+
+  if (['completed', 'failed', 'manual_review', 'refund_due'].includes(job.status)) {
+    return job; // Return unchanged
+  }
+
+  job.status = 'running';
+  job.startedAt = clock.now().toISOString();
+  job.updatedAt = job.startedAt;
   
-  const attempt: ExecutionAttempt = {
-    id: executionId,
-    jobId: job.id,
-    status: AttemptStatus.QUEUED,
-    startedAt: clock.now(),
-  };
+  if (input?.metadata) {
+    job.metadata = { ...job.metadata, ...input.metadata };
+  }
 
-  await storage.saveAttempt(attempt);
-
-  job.status = JobStatus.QUEUED;
-  job.currentAttemptId = executionId;
-  job.updatedAt = clock.now();
   await storage.saveJob(job);
-
-  await workers.dispatch({
-    jobId: job.id,
-    executionId,
-    templateId: job.templateId,
-    inputs: job.inputs,
-  });
 
   await storage.saveAuditLog({
     id: randomUUID(),
-    timestamp: clock.now(),
-    action: 'JOB_QUEUED',
-    actor: 'SYSTEM',
+    timestamp: new Date(job.startedAt),
+    action: 'JOB_STARTED',
+    actor: input?.workerId || 'SYSTEM',
     resourceType: 'JOB',
-    resourceId: job.id,
-    payload: { executionId },
-    metadata: {},
+    resourceId: job.jobId,
+    payload: {},
+    metadata: input?.metadata || {},
   });
+
+  return job;
 }
 
-/**
- * Marks a job as running.
- */
-export async function startJob(
-  command: StartJobCommand,
-  storage: IStoragePort,
-  clock: IClockPort
-): Promise<void> {
-  let attemptId = command.executionId;
-  if (!attemptId) {
-    const job = await storage.getJob(command.jobId);
-    attemptId = job?.currentAttemptId;
-  }
-
-  if (!attemptId) return;
-
-  const attempt = await storage.getAttempt(attemptId);
-  if (!attempt) return;
-
-  attempt.status = AttemptStatus.RUNNING;
-  await storage.saveAttempt(attempt);
-
-  const job = await storage.getJob(attempt.jobId);
-  if (job && job.status === JobStatus.QUEUED) {
-    job.status = JobStatus.RUNNING;
-    job.updatedAt = clock.now();
-    await storage.saveJob(job);
-  }
-}
-
-/**
- * Successfully completes a job and marks payment for release.
- */
 export async function completeJob(
-  command: CompleteJobCommand,
+  jobId: string,
+  input: CompleteJobInput,
   storage: IStoragePort,
   clock: IClockPort
-): Promise<void> {
-  const job = await storage.getJob(command.jobId);
-  if (!job) throw new Error('Job not found');
+): Promise<JobRecord> {
+  const job = await storage.getJob(jobId as any);
+  if (!job) throw new JobNotFoundError(jobId);
 
-  const existingResult = await storage.getResult(job.id);
-  if (existingResult) {
-    console.log(`Job ${job.id} already has a canonical result. Ignoring duplicate completion.`);
-    return;
+  // running/admitted/queued → completed
+  // completed              → completed
+  // failed/manual_review   → unchanged unless explicitly force-resolved
+  // refund_due             → unchanged unless explicitly force-resolved
+
+  if (['failed', 'manual_review', 'refund_due'].includes(job.status)) {
+    throw new InvalidJobTransitionError(jobId, job.status as any, 'completed' as any);
   }
 
-  let attemptId = command.executionId || job.currentAttemptId;
-  if (attemptId) {
-    const attempt = await storage.getAttempt(attemptId);
-    if (attempt) {
-      attempt.status = AttemptStatus.SUCCEEDED;
-      attempt.finishedAt = clock.now();
-      await storage.saveAttempt(attempt);
-    }
+  if (job.status === 'completed') {
+    return job;
   }
 
-  // 1. Update Job
-  job.status = JobStatus.COMPLETED;
-  job.updatedAt = clock.now();
+  const now = clock.now().toISOString();
+
+  job.status = 'completed';
+  job.completedAt = now;
+  job.updatedAt = now;
+  
+  if (input.metadata) {
+    job.metadata = { ...job.metadata, ...input.metadata };
+  }
+
   await storage.saveJob(job);
 
-  // 2. Store Result
   const jobResult: JobResult = {
-    jobId: job.id,
-    output: command.output,
-    completedAt: clock.now(),
+    jobId: job.jobId,
+    result: input.result,
+    resultType: input.resultType,
+    createdAt: now,
   };
   await storage.saveResult(jobResult);
 
-  // 3. Handle Escrow & Resolution
-  const payment = await storage.getPaymentByPaymentIdentifier(job.paymentIdentifier);
-  if (payment) {
-    payment.escrowState = EscrowState.RELEASE_PENDING;
-    payment.updatedAt = clock.now();
-    await storage.savePayment(payment);
-
-    const resolutionId = createResolutionId(randomUUID());
-    const resolution: ResolutionRecord = {
-      id: resolutionId,
-      jobId: job.id,
-      state: ResolutionState.SUCCESS,
-      resolvedAt: clock.now(),
-      resolutionMetadata: { ...command.metadata, source: 'JOB_LIFECYCLE_SUCCESS' },
-    };
-    await storage.saveResolution(resolution);
-    job.resolutionId = resolutionId;
-    await storage.saveJob(job);
-  }
-
-  // 4. Audit & Domain Events
   await storage.saveAuditLog({
     id: randomUUID(),
-    timestamp: clock.now(),
+    timestamp: new Date(now),
     action: 'JOB_COMPLETED',
     actor: 'SYSTEM',
     resourceType: 'JOB',
-    resourceId: job.id,
-    payload: { executionId: attemptId },
-    metadata: command.metadata || {},
+    resourceId: job.jobId,
+    payload: {},
+    metadata: input.metadata || {},
   });
 
-  await storage.saveDomainEvent({
-    id: randomUUID(),
-    timestamp: clock.now(),
-    type: 'JOB_COMPLETED',
-    aggregateId: job.id,
-    jobId: job.id,
-  } as any);
+  return job;
 }
 
-/**
- * Marks a job as failed.
- */
 export async function failJob(
-  command: FailJobCommand,
+  jobId: string,
+  input: FailJobInput,
   storage: IStoragePort,
   clock: IClockPort
-): Promise<void> {
-  const job = await storage.getJob(command.jobId);
-  if (!job) throw new Error('Job not found');
+): Promise<JobRecord> {
+  const job = await storage.getJob(jobId as any);
+  if (!job) throw new JobNotFoundError(jobId);
 
-  let attemptId = command.executionId || job.currentAttemptId;
-  if (attemptId) {
-    const attempt = await storage.getAttempt(attemptId);
-    if (attempt) {
-      attempt.status = AttemptStatus.FAILED;
-      attempt.finishedAt = clock.now();
-      attempt.error = command.error;
-      await storage.saveAttempt(attempt);
-    }
+  const now = clock.now().toISOString();
+
+  const statusMap: Record<string, string> = {
+    'retryable': 'failed',
+    'manual_review': 'manual_review',
+    'refund_due': 'refund_due',
+    'terminal_failed': 'failed'
+  };
+
+  job.status = statusMap[input.resolution] as any || 'failed';
+  job.failedAt = now;
+  job.updatedAt = now;
+  job.failureReason = input.reason;
+  job.failureResolution = input.resolution;
+  
+  if (input.metadata) {
+    job.metadata = { ...job.metadata, ...input.metadata };
   }
 
-  job.status = JobStatus.FAILED;
-  job.updatedAt = clock.now();
   await storage.saveJob(job);
-
-  const payment = await storage.getPaymentByPaymentIdentifier(job.paymentIdentifier);
-  if (payment) {
-    payment.escrowState = EscrowState.REFUND_PENDING;
-    payment.updatedAt = clock.now();
-    await storage.savePayment(payment);
-
-    const resolutionId = createResolutionId(randomUUID());
-    const resolution: ResolutionRecord = {
-      id: resolutionId,
-      jobId: job.id,
-      state: ResolutionState.REFUND_PENDING,
-      resolvedAt: clock.now(),
-      resolutionMetadata: { error: command.error, ...command.metadata },
-    };
-    await storage.saveResolution(resolution);
-    job.resolutionId = resolutionId;
-    await storage.saveJob(job);
-  }
 
   await storage.saveAuditLog({
     id: randomUUID(),
-    timestamp: clock.now(),
+    timestamp: new Date(now),
     action: 'JOB_FAILED',
     actor: 'SYSTEM',
     resourceType: 'JOB',
-    resourceId: job.id,
-    payload: { error: command.error },
-    metadata: command.metadata || {},
+    resourceId: job.jobId,
+    payload: { reason: input.reason, resolution: input.resolution, errorCode: input.errorCode },
+    metadata: input.metadata || {},
   });
+
+  return job;
 }
 
-/**
- * Retrieves the current status of a job.
- */
 export async function getJob(
-  query: GetJobStatusQuery,
+  jobId: string,
   storage: IStoragePort
-): Promise<GetJobStatusResult> {
-  const job = await storage.getJob(query.jobId);
-  if (!job) {
-    throw new Error(`Job ${query.jobId} not found`);
-  }
-
-  return {
-    jobId: job.id,
-    status: job.status,
-  };
+): Promise<JobRecord | null> {
+  return storage.getJob(jobId as any);
 }
 
-/**
- * Retrieves the result of a completed job.
- */
 export async function getResult(
-  query: GetJobResultQuery,
+  jobId: string,
   storage: IStoragePort
-): Promise<GetJobResultResult> {
-  const result = await storage.getResult(query.jobId);
-  return {
-    jobId: query.jobId,
-    result: result || undefined,
-  };
+): Promise<JobResult | null> {
+  return storage.getResult(jobId as any);
 }

@@ -1,5 +1,85 @@
-import { AttemptStatus, EscrowState, JobStatus, JobIntentStatus, ResolutionState } from './statuses';
-import { ExecutionId, JobId, JobTemplateId, PaymentId, JobIntentId, ResolutionId } from './ids';
+import { AttemptStatus, EscrowState, JobStatus, JobIntentStatus, ResolutionState, JobFailureResolution } from './statuses';
+import { ExecutionId, JobId, JobTemplateId, ResolutionId } from './ids';
+
+// -----------------------------------------------------------------------------
+// Public API Types from README
+// -----------------------------------------------------------------------------
+
+export type JobPrice = {
+  amount: string;
+  currency: 'USDC';
+  network: string;
+};
+
+export type VerifiedX402Payment = {
+  paymentId: string;
+  payer: string;
+  payTo?: string;
+  amount: string;
+  currency: 'USDC';
+  network: string;
+  txHash?: string;
+  raw?: unknown;
+};
+
+export type JobIntentRecord = {
+  intentId: string;
+  idempotencyKey: string;
+  buyerKey: string;
+  jobType: string;
+  inputHash: string;
+  price: JobPrice;
+  payload: Record<string, unknown>;
+  status: JobIntentStatus;
+  jobId?: string;
+  paymentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type JobRecord = {
+  jobId: string;
+  intentId?: string;
+  paymentId?: string;
+  payer?: string;
+  payTo?: string;
+  amount?: string;
+  currency?: 'USDC';
+  network?: string;
+  txHash?: string;
+  jobType: string;
+  status: JobStatus;
+  inputHash: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  queuedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  failureResolution?: JobFailureResolution;
+  metadata?: Record<string, unknown>;
+};
+
+export type JobResult = {
+  jobId: string;
+  result: Record<string, unknown>;
+  resultType?: string;
+  createdAt: string;
+};
+
+export type EnqueueArgs = {
+  jobId: string;
+  jobType: string;
+  payload: Record<string, unknown>;
+};
+
+// -----------------------------------------------------------------------------
+// Internal Engine Types (Not in public API README but used internally)
+// -----------------------------------------------------------------------------
 
 export interface JobTemplate {
   id: JobTemplateId;
@@ -14,42 +94,6 @@ export interface JobTemplate {
   createdAt: Date;
 }
 
-export interface PaymentRequirement {
-  paymentIdentifier: string;
-  clientConfig: Record<string, any>;
-}
-
-export interface JobIntent {
-  id: JobIntentId;
-  templateId: JobTemplateId;
-  inputHash: string;
-  inputs: Record<string, any>;
-  priceAmount: bigint;
-  priceCurrency: string;
-  paymentRequirement: PaymentRequirement;
-  status: JobIntentStatus;
-  expiresAt: Date;
-  createdAt: Date;
-}
-
-/**
- * Encapsulates the financial life of a job.
- * Queryable independently from Job execution status.
- */
-export interface PaymentRecord {
-  id: PaymentId;
-  jobIntentId: JobIntentId;
-  jobId?: JobId; // Linked once admitted
-  paymentIdentifier: string; // The external reference (e.g. x402 address or transaction hash)
-  amount: bigint;
-  currency: string;
-  escrowState: EscrowState;
-  paymentRail: string;
-  metadata: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface ExecutionAttempt {
   id: ExecutionId;
   jobId: JobId;
@@ -60,38 +104,10 @@ export interface ExecutionAttempt {
   error?: string;
 }
 
-/**
- * Result of a successful job execution.
- * Must remain retrievable even if response path failed.
- */
-export interface JobResult {
-  jobId: JobId;
-  output: Record<string, any>;
-  completedAt: Date;
-}
-
-/**
- * The final resolution of funds.
- * Decoupled from execution status.
- */
 export interface ResolutionRecord {
   id: ResolutionId;
   jobId: JobId;
   state: ResolutionState;
   resolvedAt: Date;
   resolutionMetadata: Record<string, any>;
-}
-
-export interface Job {
-  id: JobId; // The canonical identity for all post-payment actions
-  jobIntentId: JobIntentId;
-  templateId: JobTemplateId;
-  status: JobStatus;
-  inputs: Record<string, any>;
-  paymentIdentifier: string; // Link back to the immutable payment source
-  currentAttemptId?: ExecutionId;
-  resolutionId?: ResolutionId;
-  deadlineAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
 }

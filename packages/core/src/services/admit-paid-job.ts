@@ -1,118 +1,104 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
-import { AdmitPaidJobCommand, AdmitPaidJobResult } from '../use-cases/admit';
-import { EscrowState, JobStatus, JobIntentStatus } from '../domain/statuses';
-import { createJobId, createPaymentId } from '../domain/ids';
-import { hashInputs } from '../lib/hash-input';
+import { AdmitPaidJobInput, AdmitPaidJobResult } from '../use-cases/admit';
+import { createJobId } from '../domain/ids';
+import { JobRecord } from '../domain/models';
 import {
-  JobIntentAlreadyFundedError,
   JobIntentExpiredError,
   JobIntentNotFoundError,
-  ReplayConflictError,
+  PaymentAlreadyAdmittedError,
 } from '../lib/errors';
-import { Job, PaymentRecord } from '../domain/models';
 
 export async function admitPaidJob(
-  command: AdmitPaidJobCommand,
+  input: AdmitPaidJobInput,
   storage: IStoragePort,
   clock: IClockPort
 ): Promise<AdmitPaidJobResult> {
-  const intent = await storage.getJobIntent(command.jobIntentId);
-  if (!intent) {
-    throw new JobIntentNotFoundError(command.jobIntentId);
+  const now = clock.now().toISOString();
+
+  if (input.intentId) {
+    const intent = await storage.getJobIntent(input.intentId as any);
+    if (!intent) {
+      throw new JobIntentNotFoundError(input.intentId);
+    }
+    if (intent.expiresAt && new Date(intent.expiresAt) < clock.now()) {
+      throw new JobIntentExpiredError(input.intentId);
+    }
+    
+    intent.status = 'paid';
+    intent.paymentId = input.paymentId;
+    await storage.saveJobIntent(intent);
   }
 
-  if (intent.status === JobIntentStatus.FUNDED) {
-    // Already funded
-  } else if (intent.status !== JobIntentStatus.OPEN) {
-    throw new JobIntentAlreadyFundedError(command.jobIntentId);
-  }
-
-  if (intent.expiresAt < clock.now()) {
-    throw new JobIntentExpiredError(command.jobIntentId);
-  }
-
-  return await storage.withPaymentIdentifierLock(command.paymentIdentifier, async () => {
-    const existingJob = await storage.getJobByPaymentIdentifier(command.paymentIdentifier);
+  return await storage.withPaymentIdentifierLock(input.paymentId, async () => {
+    const existingJob = await storage.getJobByPaymentId(input.network, input.paymentId);
 
     if (existingJob) {
-      const currentInputHash = hashInputs(existingJob.templateId, command.inputs);
-      if (currentInputHash === intent.inputHash) {
-        return {
-          jobId: existingJob.id,
-          replayed: true,
-        };
-      } else {
-        throw new ReplayConflictError(command.paymentIdentifier);
+      if (existingJob.inputHash !== input.inputHash) {
+        throw new PaymentAlreadyAdmittedError(input.paymentId, existingJob.jobId);
+      }
+      return {
+        type: 'already_admitted',
+        jobId: existingJob.jobId,
+        status: existingJob.status,
+        paymentId: existingJob.paymentId!,
+        intentId: existingJob.intentId,
+      };
+    }
+
+    const jobId = createJobId(randomUUID());
+    const job: JobRecord = {
+      jobId,
+      intentId: input.intentId,
+      paymentId: input.paymentId,
+      payer: input.payer,
+      payTo: input.payTo,
+      amount: input.amount,
+      currency: input.currency,
+      network: input.network,
+      txHash: input.txHash,
+      jobType: input.jobType,
+      status: 'admitted',
+      inputHash: input.inputHash,
+      payload: input.payload,
+      createdAt: now,
+      updatedAt: now,
+      metadata: input.metadata,
+    };
+
+    await storage.saveJob(job);
+
+    if (input.enqueue) {
+      try {
+        await input.enqueue({
+          jobId: job.jobId,
+          jobType: job.jobType,
+          payload: job.payload,
+        });
+      } catch (err) {
+        console.error(`Failed to enqueue job ${job.jobId}`, err);
+        // Do not fail admission if enqueue fails (outbox pattern should be used in prod)
       }
     }
 
-    const paymentRecord: PaymentRecord = {
-      id: createPaymentId(randomUUID()),
-      jobIntentId: intent.id,
-      paymentIdentifier: command.paymentIdentifier,
-      amount: command.amount,
-      currency: command.currency,
-      escrowState: EscrowState.HELD,
-      paymentRail: 'UNKNOWN',
-      metadata: {
-        ...(command.paymentMetadata || {}),
-        verifiedAt: clock.now().toISOString(),
-      },
-      createdAt: clock.now(),
-      updatedAt: clock.now(),
-    };
-
-    intent.status = JobIntentStatus.FUNDED;
-    await storage.saveJobIntent(intent);
-
-    const template = await storage.getTemplate(intent.templateId);
-    const deadlineAt = new Date(clock.now().getTime() + (template?.slaSeconds || 60) * 1000);
-    
-    const jobId = createJobId(randomUUID());
-    const job: Job = {
-      id: jobId,
-      jobIntentId: intent.id,
-      templateId: intent.templateId,
-      status: JobStatus.ADMITTED,
-      inputs: intent.inputs,
-      paymentIdentifier: command.paymentIdentifier,
-      deadlineAt,
-      createdAt: clock.now(),
-      updatedAt: clock.now(),
-    };
-
-    paymentRecord.jobId = jobId;
-
-    await storage.savePayment(paymentRecord);
-    await storage.saveJob(job);
-
     await storage.saveAuditLog({
       id: randomUUID(),
-      timestamp: clock.now(),
-      action: 'PAYMENT_ADMITTED',
-      actor: 'SYSTEM',
-      resourceType: 'PAYMENT',
-      resourceId: paymentRecord.id,
-      payload: { paymentIdentifier: command.paymentIdentifier },
-      metadata: {},
-    });
-
-    await storage.saveAuditLog({
-      id: randomUUID(),
-      timestamp: clock.now(),
+      timestamp: new Date(now),
       action: 'JOB_ADMITTED',
       actor: 'SYSTEM',
       resourceType: 'JOB',
-      resourceId: job.id,
-      payload: { jobIntentId: intent.id },
+      resourceId: jobId,
+      payload: { paymentId: input.paymentId },
       metadata: {},
     });
 
     return {
-      jobId: job.id,
-      replayed: false,
+      type: 'admitted',
+      jobId,
+      status: job.status,
+      paymentId: input.paymentId,
+      intentId: input.intentId,
     };
   });
 }

@@ -1,36 +1,25 @@
-import { JobId, JobIntentId } from '../domain/ids';
+import { EnqueueArgs, JobStatus } from '../domain/models';
 
-export interface AdmitPaidJobCommand {
-  jobIntentId: JobIntentId;
-  
-  /**
-   * The canonical identifier for the payment (e.g. x402 address).
-   * Assumed to be verified by the application layer.
-   */
-  paymentIdentifier: string;
-  
-  /**
-   * The payment amount verified by the application layer.
-   */
-  amount: bigint;
-  
-  /**
-   * The payment currency verified by the application layer.
-   */
-  currency: string;
+export type AdmitPaidJobInput = {
+  paymentId: string;
+  intentId?: string;
+  payer: string;
+  payTo?: string;
+  amount: string;
+  currency: 'USDC';
+  network: string;
+  txHash?: string;
+  jobType: string;
+  inputHash: string;
+  payload: Record<string, unknown>;
+  enqueue?: (args: EnqueueArgs) => Promise<void>;
+  metadata?: Record<string, unknown>;
+};
 
-  /**
-   * Optional metadata about the verified payment.
-   */
-  paymentMetadata?: Record<string, any>;
-
-  /**
-   * Re-submitted inputs for structural verification (idempotency).
-   */
-  inputs: Record<string, any>;
-}
-
-export interface AdmitPaidJobResult {
-  jobId: JobId;
-  replayed: boolean;
-}
+export type AdmitPaidJobResult = {
+  type: 'admitted' | 'already_admitted';
+  jobId: string;
+  status: JobStatus;
+  paymentId: string;
+  intentId?: string;
+};
