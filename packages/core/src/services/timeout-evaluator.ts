@@ -22,8 +22,8 @@ export async function evaluateTimeouts(
     if (job.deadlineAt < now) {
       console.log(`[TimeoutEvaluator] Job ${job.id} timed out. Policy transition...`);
       
-      // 1. Transition Job Status
-      job.status = JobStatus.FAILED;
+      // 1. Transition Job Status to REFUND_DUE (New model)
+      job.status = JobStatus.REFUND_DUE;
       job.updatedAt = now;
       await storage.saveJob(job);
 
@@ -39,7 +39,7 @@ export async function evaluateTimeouts(
         const resolution: ResolutionRecord = {
           id: resolutionId,
           jobId: job.id,
-          state: ResolutionState.PENDING, // Will be RESOLVED_REFUND later
+          state: ResolutionState.REFUND_PENDING,
           resolvedAt: now,
           resolutionMetadata: { reason: 'TIMEOUT' }
         };
@@ -52,7 +52,7 @@ export async function evaluateTimeouts(
       await storage.saveAuditLog({
         id: randomUUID(),
         timestamp: now,
-        action: 'ATTEMPT_FAILED',
+        action: 'JOB_TIMED_OUT',
         actor: 'SYSTEM',
         resourceType: 'JOB',
         resourceId: job.id,

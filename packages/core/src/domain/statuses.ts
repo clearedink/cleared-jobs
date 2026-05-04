@@ -6,13 +6,13 @@ export enum PaymentIntentStatus {
 }
 
 export enum JobStatus {
-  PAYMENT_REQUIRED = 'PAYMENT_REQUIRED',
-  FUNDED = 'FUNDED',
-  DISPATCHED = 'DISPATCHED',
+  ADMITTED = 'ADMITTED',
+  QUEUED = 'QUEUED',
   RUNNING = 'RUNNING',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
-  RESOLUTION_REQUIRED = 'RESOLUTION_REQUIRED',
+  MANUAL_REVIEW = 'MANUAL_REVIEW',
+  REFUND_DUE = 'REFUND_DUE',
 }
 
 export enum EscrowState {
@@ -33,7 +33,7 @@ export enum ResolutionState {
 }
 
 export enum AttemptStatus {
-  DISPATCHED = 'DISPATCHED',
+  QUEUED = 'QUEUED',
   RUNNING = 'RUNNING',
   SUCCEEDED = 'SUCCEEDED',
   FAILED = 'FAILED',

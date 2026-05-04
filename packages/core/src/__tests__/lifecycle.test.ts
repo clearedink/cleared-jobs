@@ -178,7 +178,7 @@ describe('Job Lifecycle', () => {
     const { jobId } = await admitFundedJob({ paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs }, storage, payments, clock);
     
     const executionId = createExecutionId(randomUUID());
-    await storage.saveAttempt({ id: executionId, jobId, status: 'DISPATCHED' as any, startedAt: clock.now() });
+    await storage.saveAttempt({ id: executionId, jobId, status: 'QUEUED' as any, startedAt: clock.now() });
 
     await completeJob(
       { jobId, executionId, output: { result: 'first' } },
@@ -189,7 +189,7 @@ describe('Job Lifecycle', () => {
     expect(jobResult?.output).toEqual({ result: 'first' });
   });
 
-  it('4. timeout evaluator moves overdue jobs toward failure', async () => {
+  it('4. timeout evaluator moves overdue jobs toward refund', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
     const intent = await getOrCreatePaymentIntent({
@@ -212,7 +212,7 @@ describe('Job Lifecycle', () => {
     expect(count).toBe(1);
 
     const job = await storage.getJob(jobId);
-    expect(job?.status).toBe(JobStatus.FAILED);
+    expect(job?.status).toBe(JobStatus.REFUND_DUE);
   });
 
   it('5. audit events are emitted for key life cycle steps', async () => {

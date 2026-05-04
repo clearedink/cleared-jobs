@@ -95,7 +95,7 @@ export async function admitFundedJob(
       id: jobId,
       paymentIntentId: intent.id,
       templateId: intent.templateId,
-      status: JobStatus.FUNDED,
+      status: JobStatus.ADMITTED,
       inputs: intent.inputs,
       paymentIdentifier: command.paymentIdentifier,
       deadlineAt,
@@ -123,7 +123,7 @@ export async function admitFundedJob(
     await storage.saveAuditLog({
       id: randomUUID(),
       timestamp: clock.now(),
-      action: 'JOB_FUNDED',
+      action: 'JOB_ADMITTED',
       actor: 'SYSTEM',
       resourceType: 'JOB',
       resourceId: job.id,

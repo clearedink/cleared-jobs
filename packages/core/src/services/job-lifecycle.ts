@@ -33,13 +33,13 @@ export async function dispatchJob(
   const attempt: ExecutionAttempt = {
     id: executionId,
     jobId: job.id,
-    status: AttemptStatus.DISPATCHED,
+    status: AttemptStatus.QUEUED,
     startedAt: clock.now(),
   };
 
   await storage.saveAttempt(attempt);
 
-  job.status = JobStatus.DISPATCHED;
+  job.status = JobStatus.QUEUED;
   job.currentAttemptId = executionId;
   job.updatedAt = clock.now();
   await storage.saveJob(job);
@@ -54,7 +54,7 @@ export async function dispatchJob(
   await storage.saveAuditLog({
     id: randomUUID(),
     timestamp: clock.now(),
-    action: 'JOB_DISPATCHED',
+    action: 'JOB_QUEUED',
     actor: 'SYSTEM',
     resourceType: 'JOB',
     resourceId: job.id,
@@ -87,7 +87,7 @@ export async function startJob(
   await storage.saveAttempt(attempt);
 
   const job = await storage.getJob(attempt.jobId);
-  if (job && job.status === JobStatus.DISPATCHED) {
+  if (job && job.status === JobStatus.QUEUED) {
     job.status = JobStatus.RUNNING;
     job.updatedAt = clock.now();
     await storage.saveJob(job);
