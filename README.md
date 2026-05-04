@@ -194,7 +194,6 @@ The Cleared SDK is a TypeScript monorepo.
 - `packages/core`: Domain models, status enums, admission logic, job lifecycle functions.
 - `packages/x402`: Thin adapter that maps verified x402 payments into Cleared payment objects.
 - `packages/storage-memory`: In-memory storage for local development and tests.
-- `packages/worker-adapter`: Helpers for workers to report start, completion, and failure.
 - `examples/basic-seller-api`: Runnable reference implementation.
 
 Cleared is designed so the core does not depend on one HTTP framework, queue, or payment implementation.

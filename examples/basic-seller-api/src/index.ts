@@ -75,7 +75,7 @@ function clearedErrorHandler(err: any, req: express.Request, res: express.Respon
 
   next(err);
 }
-import { CallbackClient, FakeWorker } from '@cleared/worker-adapter';
+import { CallbackClient, FakeWorker } from '../../tests/fake-worker';
 
 const app = express();
 app.use(express.json());
