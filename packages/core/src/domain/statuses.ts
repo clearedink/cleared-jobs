@@ -1,42 +1,42 @@
 export enum PaymentIntentStatus {
-  OPEN = 'OPEN',
-  FUNDED = 'FUNDED',
-  EXPIRED = 'EXPIRED',
-  CANCELLED = 'CANCELLED',
+  OPEN = 'open',
+  FUNDED = 'funded',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled',
 }
 
 export enum JobStatus {
-  ADMITTED = 'ADMITTED',
-  QUEUED = 'QUEUED',
-  RUNNING = 'RUNNING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  MANUAL_REVIEW = 'MANUAL_REVIEW',
-  REFUND_DUE = 'REFUND_DUE',
+  ADMITTED = 'admitted',
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  MANUAL_REVIEW = 'manual_review',
+  REFUND_DUE = 'refund_due',
 }
 
 export enum EscrowState {
-  NOT_FUNDED = 'NOT_FUNDED',
-  HELD = 'HELD',
-  RELEASE_PENDING = 'RELEASE_PENDING',
-  RELEASED = 'RELEASED',
-  REFUND_PENDING = 'REFUND_PENDING',
-  REFUNDED = 'REFUNDED',
+  NOT_FUNDED = 'not_funded',
+  HELD = 'held',
+  RELEASE_PENDING = 'release_pending',
+  RELEASED = 'released',
+  REFUND_PENDING = 'refund_pending',
+  REFUNDED = 'refunded',
 }
 
 export enum ResolutionState {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  REFUND_PENDING = 'REFUND_PENDING',
-  REFUNDED = 'REFUNDED',
-  MANUAL_REVIEW = 'MANUAL_REVIEW',
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  REFUND_PENDING = 'refund_pending',
+  REFUNDED = 'refunded',
+  MANUAL_REVIEW = 'manual_review',
 }
 
 export enum AttemptStatus {
-  QUEUED = 'QUEUED',
-  RUNNING = 'RUNNING',
-  SUCCEEDED = 'SUCCEEDED',
-  FAILED = 'FAILED',
-  TIMED_OUT = 'TIMED_OUT',
-  ABORTED = 'ABORTED',
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  SUCCEEDED = 'succeeded',
+  FAILED = 'failed',
+  TIMED_OUT = 'timed_out',
+  ABORTED = 'aborted',
 }

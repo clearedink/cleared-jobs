@@ -37,7 +37,7 @@ export class MockX402Adapter implements IPaymentPort {
       paymentIdentifier,
       amount: quote.priceAmount,
       currency: quote.priceCurrency,
-      status: 'OPEN',
+      status: 'open',
       clientConfig: challenge
     };
   }

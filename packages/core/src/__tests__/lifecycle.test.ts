@@ -13,6 +13,7 @@ import {
   createExecutionId,
   PaymentIntentId,
   JobStatus,
+  AttemptStatus,
   hashInputs
 } from '../index';
 import { MemoryStorage } from '../../../storage-memory/src/memory-storage';
@@ -218,7 +219,7 @@ describe('Job Lifecycle', () => {
     }, storage, clock);
     
     const executionId = createExecutionId(randomUUID());
-    await storage.saveAttempt({ id: executionId, jobId, status: 'QUEUED' as any, startedAt: clock.now() });
+    await storage.saveAttempt({ id: executionId, jobId, status: AttemptStatus.QUEUED, startedAt: clock.now() });
 
     await completeJob(
       { jobId, executionId, output: { result: 'first' } },
