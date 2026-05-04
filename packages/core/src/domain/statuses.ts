@@ -1,4 +1,4 @@
-export enum PaymentIntentStatus {
+export enum JobIntentStatus {
   OPEN = 'open',
   FUNDED = 'funded',
   EXPIRED = 'expired',

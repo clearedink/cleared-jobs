@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import { 
-  getOrCreatePaymentIntent, 
-  admitFundedJob, 
+  getOrCreateJobIntent, 
+  admitPaidJob, 
   handlePaidJobRequest,
   startJob,
   completeJob,
@@ -11,7 +11,7 @@ import {
   SystemClock,
   createJobTemplateId,
   createExecutionId,
-  PaymentIntentId,
+  JobIntentId,
   JobStatus,
   AttemptStatus,
   hashInputs
@@ -58,7 +58,7 @@ describe('Job Lifecycle', () => {
     }]);
   });
 
-  it('1. getOrCreatePaymentIntent returns paymentIntentId and requirements', async () => {
+  it('1. getOrCreateJobIntent returns jobIntentId and requirements', async () => {
     const inputs = { foo: 'bar' };
     const inputHash = hashInputs(jobType, inputs);
     
@@ -69,7 +69,7 @@ describe('Job Lifecycle', () => {
       priceCurrency: 'USDC' 
     } as any);
 
-    const result = await getOrCreatePaymentIntent(
+    const result = await getOrCreateJobIntent(
       {
         idempotencyKey: 'id-1',
         buyerKey: 'user-1',
@@ -86,7 +86,7 @@ describe('Job Lifecycle', () => {
       clock
     );
 
-    expect(result.paymentIntentId).toBeDefined();
+    expect(result.jobIntentId).toBeDefined();
     expect(result.paymentRequirement.paymentIdentifier).toContain('x402-pt-');
   });
 
@@ -122,7 +122,7 @@ describe('Job Lifecycle', () => {
 
     expect(res1.type).toBe('payment_required');
     if (res1.type === 'payment_required') {
-      expect(res1.paymentIntentId).toBeDefined();
+      expect(res1.jobIntentId).toBeDefined();
       expect(res1.paymentRequirement.paymentIdentifier).toBeDefined();
     }
 
@@ -194,7 +194,7 @@ describe('Job Lifecycle', () => {
     
     const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
     
-    const intent = await getOrCreatePaymentIntent({
+    const intent = await getOrCreateJobIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
@@ -210,8 +210,8 @@ describe('Job Lifecycle', () => {
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
     const verification = await payments.verifyProof(proof);
 
-    const { jobId } = await admitFundedJob({ 
-      paymentIntentId: intent.paymentIntentId, 
+    const { jobId } = await admitPaidJob({ 
+      jobIntentId: intent.jobIntentId, 
       paymentIdentifier: verification.paymentIdentifier, 
       amount: verification.amount,
       currency: verification.currency,
@@ -235,7 +235,7 @@ describe('Job Lifecycle', () => {
     const inputHash = hashInputs(jobType, inputs);
     const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
 
-    const intent = await getOrCreatePaymentIntent({
+    const intent = await getOrCreateJobIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
@@ -251,8 +251,8 @@ describe('Job Lifecycle', () => {
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
     const verification = await payments.verifyProof(proof);
 
-    await admitFundedJob({ 
-      paymentIntentId: intent.paymentIntentId, 
+    await admitPaidJob({ 
+      jobIntentId: intent.jobIntentId, 
       paymentIdentifier: verification.paymentIdentifier, 
       amount: verification.amount,
       currency: verification.currency,
@@ -275,7 +275,7 @@ describe('Job Lifecycle', () => {
     const inputHash = hashInputs(jobType, inputs);
     const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
 
-    const intent = await getOrCreatePaymentIntent({
+    const intent = await getOrCreateJobIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
@@ -291,8 +291,8 @@ describe('Job Lifecycle', () => {
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
     const verification = await payments.verifyProof(proof);
 
-    await admitFundedJob({ 
-      paymentIntentId: intent.paymentIntentId, 
+    await admitPaidJob({ 
+      jobIntentId: intent.jobIntentId, 
       paymentIdentifier: verification.paymentIdentifier, 
       amount: verification.amount,
       currency: verification.currency,
@@ -301,7 +301,7 @@ describe('Job Lifecycle', () => {
 
     const logs: any[] = (storage as any).auditLogs;
     const actions = logs.map(l => l.action);
-    expect(actions).toContain('PAYMENT_INTENT_CREATED');
+    expect(actions).toContain('JOB_INTENT_CREATED');
     expect(actions).toContain('PAYMENT_ADMITTED');
     expect(actions).toContain('JOB_ADMITTED');
   });

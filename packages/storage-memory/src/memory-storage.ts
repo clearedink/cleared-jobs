@@ -9,8 +9,8 @@ import {
   JobTemplateId,
   PaymentId,
   PaymentRecord,
-  PaymentIntent,
-  PaymentIntentId,
+  JobIntent,
+  JobIntentId,
   ResolutionId,
   ResolutionRecord,
   DomainEvent,
@@ -18,7 +18,7 @@ import {
 
 export class MemoryStorage implements IStoragePort {
   private templates = new Map<JobTemplateId, JobTemplate>();
-  private paymentIntents = new Map<PaymentIntentId, PaymentIntent>();
+  private jobIntents = new Map<JobIntentId, JobIntent>();
   private payments = new Map<PaymentId, PaymentRecord>();
   private jobs = new Map<JobId, Job>();
   private attempts = new Map<ExecutionId, ExecutionAttempt>();
@@ -34,20 +34,24 @@ export class MemoryStorage implements IStoragePort {
     return this.templates.get(id) || null;
   }
 
+  async getTemplateByJobType(jobType: string): Promise<JobTemplate | null> {
+    return Array.from(this.templates.values()).find(t => t.id === jobType) || null;
+  }
+
   async listTemplates(): Promise<JobTemplate[]> {
     return Array.from(this.templates.values());
   }
 
-  async savePaymentIntent(intent: PaymentIntent): Promise<void> {
-    this.paymentIntents.set(intent.id, intent);
+  async saveJobIntent(intent: JobIntent): Promise<void> {
+    this.jobIntents.set(intent.id, intent);
   }
 
-  async getPaymentIntent(id: PaymentIntentId): Promise<PaymentIntent | null> {
-    return this.paymentIntents.get(id) || null;
+  async getJobIntent(id: JobIntentId): Promise<JobIntent | null> {
+    return this.jobIntents.get(id) || null;
   }
 
-  async findPaymentIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<PaymentIntent | null> {
-    return Array.from(this.paymentIntents.values()).find(
+  async findJobIntentByInputHash(templateId: JobTemplateId, inputHash: string): Promise<JobIntent | null> {
+    return Array.from(this.jobIntents.values()).find(
       q => q.templateId === templateId && q.inputHash === inputHash
     ) || null;
   }
@@ -60,8 +64,8 @@ export class MemoryStorage implements IStoragePort {
     return this.payments.get(id) || null;
   }
 
-  async getPaymentByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<PaymentRecord | null> {
-    return Array.from(this.payments.values()).find(p => p.paymentIntentId === paymentIntentId) || null;
+  async getPaymentByJobIntentId(jobIntentId: JobIntentId): Promise<PaymentRecord | null> {
+    return Array.from(this.payments.values()).find(p => p.jobIntentId === jobIntentId) || null;
   }
 
   async getPaymentByPaymentIdentifier(paymentIdentifier: string): Promise<PaymentRecord | null> {
@@ -80,12 +84,12 @@ export class MemoryStorage implements IStoragePort {
     return this.jobs.get(id) || null;
   }
 
-  async getJobByPaymentIntentId(paymentIntentId: PaymentIntentId): Promise<Job | null> {
-    return Array.from(this.jobs.values()).find(j => j.paymentIntentId === paymentIntentId) || null;
+  async getJobByJobIntentId(jobIntentId: JobIntentId): Promise<Job | null> {
+    return Array.from(this.jobs.values()).find(j => j.jobIntentId === jobIntentId) || null;
   }
 
   async listActiveJobs(): Promise<Job[]> {
-    const terminalStatuses = ['COMPLETED', 'FAILED', 'CANCELLED'];
+    const terminalStatuses = ['completed', 'failed', 'cancelled'];
     return Array.from(this.jobs.values()).filter(j => !terminalStatuses.includes(j.status));
   }
 
@@ -167,7 +171,7 @@ export class MemoryStorage implements IStoragePort {
   }
 
   // Pre-seed helper for dev
-  seedTemplates(templates: JobTemplate[]) {
+  async seedTemplates(templates: JobTemplate[]) {
     templates.forEach(t => this.templates.set(t.id, t));
   }
 }

@@ -1,5 +1,5 @@
-import { JobStatus, PaymentIntentStatus } from '../domain/statuses';
-import { JobId, PaymentIntentId } from '../domain/ids';
+import { JobStatus, JobIntentStatus } from '../domain/statuses';
+import { JobId, JobIntentId } from '../domain/ids';
 import { PaymentRequirement } from '../domain/models';
 
 export interface HandlePaidJobRequestCommand {
@@ -33,14 +33,14 @@ export interface HandlePaidJobRequestCommand {
 }
 
 export type HandlePaidJobRequestResult =
-  | PaymentRequiredResult
+  | JobIntentRequiredResult
   | PaidJobAcceptedResult;
 
-export interface PaymentRequiredResult {
+export interface JobIntentRequiredResult {
   type: 'payment_required';
-  paymentIntentId: PaymentIntentId;
+  jobIntentId: JobIntentId;
   paymentRequirement: PaymentRequirement;
-  status: PaymentIntentStatus;
+  status: JobIntentStatus;
   expiresAt: Date;
   price: {
     amount: string;
@@ -50,7 +50,7 @@ export interface PaymentRequiredResult {
 
 export interface PaidJobAcceptedResult {
   type: 'accepted' | 'already_accepted';
-  paymentIntentId: PaymentIntentId;
+  jobIntentId: JobIntentId;
   jobId: JobId;
   status: JobStatus;
 }

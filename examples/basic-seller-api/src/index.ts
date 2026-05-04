@@ -2,8 +2,8 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import { 
   handlePaidJobRequest, 
-  getJobStatus, 
-  getJobResult,
+  getJob, 
+  getResult,
   SystemClock,
   createJobTemplateId,
   createJobId,
@@ -55,8 +55,8 @@ function clearedErrorHandler(err: any, req: express.Request, res: express.Respon
     return sendError(res, 400, err.code, err.message);
   }
   
-  if (err.code === 'PAYMENT_INTENT_EXPIRED') {
-    return sendError(res, 402, 'PAYMENT_INTENT_EXPIRED', err.message);
+  if (err.code === 'JOB_INTENT_EXPIRED') {
+    return sendError(res, 402, 'JOB_INTENT_EXPIRED', err.message);
   }
 
   next(err);
@@ -116,10 +116,7 @@ app.post('/v1/jobs/run', async (req, res, next) => {
   try {
     const inputHash = hashInputs(JOB_TYPE, inputs || {});
     
-    // 1. In this new decoupled model, the application layer (Seller API) 
-    // is responsible for orchestrating the payment adapter.
-    
-    // Generate a payment requirement (using mock adapter)
+    // 1. Generate a payment requirement (using mock adapter)
     const requirement = await payments.createIntent({
       id: idempotency_key || randomUUID(),
       priceAmount: 1000000n,
@@ -178,7 +175,7 @@ app.post('/v1/jobs/run', async (req, res, next) => {
 app.get('/v1/jobs/:jobId', async (req, res, next) => {
   try {
     const jobId = createJobId(req.params.jobId);
-    const status = await getJobStatus({ jobId }, storage);
+    const status = await getJob({ jobId }, storage);
     res.json(status);
   } catch (err) {
     next(err);
@@ -188,7 +185,7 @@ app.get('/v1/jobs/:jobId', async (req, res, next) => {
 app.get('/v1/jobs/:jobId/result', async (req, res, next) => {
   try {
     const jobId = createJobId(req.params.jobId);
-    const resultResponse = await getJobResult({ jobId }, storage);
+    const resultResponse = await getResult({ jobId }, storage);
     
     if (!resultResponse.result) {
       return sendError(res, 404, 'RESULT_NOT_READY', 'Job result is not ready yet');

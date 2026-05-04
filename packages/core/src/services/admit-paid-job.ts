@@ -1,42 +1,39 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
-import { AdmitFundedJobCommand, AdmitFundedJobResult } from '../use-cases/admit';
-import { EscrowState, JobStatus, PaymentIntentStatus } from '../domain/statuses';
+import { AdmitPaidJobCommand, AdmitPaidJobResult } from '../use-cases/admit';
+import { EscrowState, JobStatus, JobIntentStatus } from '../domain/statuses';
 import { createJobId, createPaymentId } from '../domain/ids';
 import { hashInputs } from '../lib/hash-input';
 import {
-  PaymentIntentAlreadyFundedError,
-  PaymentIntentExpiredError,
-  PaymentIntentNotFoundError,
+  JobIntentAlreadyFundedError,
+  JobIntentExpiredError,
+  JobIntentNotFoundError,
   ReplayConflictError,
 } from '../lib/errors';
 import { Job, PaymentRecord } from '../domain/models';
 
-export async function admitFundedJob(
-  command: AdmitFundedJobCommand,
+export async function admitPaidJob(
+  command: AdmitPaidJobCommand,
   storage: IStoragePort,
   clock: IClockPort
-): Promise<AdmitFundedJobResult> {
-  // 1. Load the intent and validate
-  const intent = await storage.getPaymentIntent(command.paymentIntentId);
+): Promise<AdmitPaidJobResult> {
+  const intent = await storage.getJobIntent(command.jobIntentId);
   if (!intent) {
-    throw new PaymentIntentNotFoundError(command.paymentIntentId);
+    throw new JobIntentNotFoundError(command.jobIntentId);
   }
 
-  if (intent.status === PaymentIntentStatus.FUNDED) {
+  if (intent.status === JobIntentStatus.FUNDED) {
     // Already funded
-  } else if (intent.status !== PaymentIntentStatus.OPEN) {
-    throw new PaymentIntentAlreadyFundedError(command.paymentIntentId);
+  } else if (intent.status !== JobIntentStatus.OPEN) {
+    throw new JobIntentAlreadyFundedError(command.jobIntentId);
   }
 
   if (intent.expiresAt < clock.now()) {
-    throw new PaymentIntentExpiredError(command.paymentIntentId);
+    throw new JobIntentExpiredError(command.jobIntentId);
   }
 
-  // 2. Use storage lock for atomicity
   return await storage.withPaymentIdentifierLock(command.paymentIdentifier, async () => {
-    // 3. Check if a job already exists for this paymentIdentifier (Idempotency)
     const existingJob = await storage.getJobByPaymentIdentifier(command.paymentIdentifier);
 
     if (existingJob) {
@@ -51,10 +48,9 @@ export async function admitFundedJob(
       }
     }
 
-    // 4. Create immutable payment record
     const paymentRecord: PaymentRecord = {
       id: createPaymentId(randomUUID()),
-      paymentIntentId: intent.id,
+      jobIntentId: intent.id,
       paymentIdentifier: command.paymentIdentifier,
       amount: command.amount,
       currency: command.currency,
@@ -68,18 +64,16 @@ export async function admitFundedJob(
       updatedAt: clock.now(),
     };
 
-    // 5. Mark intent as funded
-    intent.status = PaymentIntentStatus.FUNDED;
-    await storage.savePaymentIntent(intent);
+    intent.status = JobIntentStatus.FUNDED;
+    await storage.saveJobIntent(intent);
 
-    // 6. Create admitted job
     const template = await storage.getTemplate(intent.templateId);
     const deadlineAt = new Date(clock.now().getTime() + (template?.slaSeconds || 60) * 1000);
     
     const jobId = createJobId(randomUUID());
     const job: Job = {
       id: jobId,
-      paymentIntentId: intent.id,
+      jobIntentId: intent.id,
       templateId: intent.templateId,
       status: JobStatus.ADMITTED,
       inputs: intent.inputs,
@@ -94,7 +88,6 @@ export async function admitFundedJob(
     await storage.savePayment(paymentRecord);
     await storage.saveJob(job);
 
-    // 7. Append Audit Events
     await storage.saveAuditLog({
       id: randomUUID(),
       timestamp: clock.now(),
@@ -113,7 +106,7 @@ export async function admitFundedJob(
       actor: 'SYSTEM',
       resourceType: 'JOB',
       resourceId: job.id,
-      payload: { paymentIntentId: intent.id },
+      payload: { jobIntentId: intent.id },
       metadata: {},
     });
 

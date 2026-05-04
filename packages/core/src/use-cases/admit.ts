@@ -1,7 +1,7 @@
-import { JobId, PaymentIntentId } from '../domain/ids';
+import { JobId, JobIntentId } from '../domain/ids';
 
-export interface AdmitFundedJobCommand {
-  paymentIntentId: PaymentIntentId;
+export interface AdmitPaidJobCommand {
+  jobIntentId: JobIntentId;
   
   /**
    * The canonical identifier for the payment (e.g. x402 address).
@@ -30,7 +30,7 @@ export interface AdmitFundedJobCommand {
   inputs: Record<string, any>;
 }
 
-export interface AdmitFundedJobResult {
+export interface AdmitPaidJobResult {
   jobId: JobId;
   replayed: boolean;
 }

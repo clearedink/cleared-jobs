@@ -1,7 +1,7 @@
-import { PaymentIntentId } from '../domain/ids';
+import { JobIntentId } from '../domain/ids';
 import { PaymentRequirement } from '../domain/models';
 
-export interface GetOrCreatePaymentIntentCommand {
+export interface GetOrCreateJobIntentCommand {
   idempotencyKey: string;
   buyerKey: string;
   jobType: string;
@@ -19,8 +19,8 @@ export interface GetOrCreatePaymentIntentCommand {
   paymentRequirement: PaymentRequirement;
 }
 
-export interface GetOrCreatePaymentIntentResult {
-  paymentIntentId: PaymentIntentId;
+export interface GetOrCreateJobIntentResult {
+  jobIntentId: JobIntentId;
   paymentRequirement: PaymentRequirement;
   price: {
     amount: string;

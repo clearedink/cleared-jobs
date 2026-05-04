@@ -11,21 +11,21 @@ export class TemplateNotFoundError extends DomainError {
   }
 }
 
-export class PaymentIntentNotFoundError extends DomainError {
+export class JobIntentNotFoundError extends DomainError {
   constructor(id: string) {
-    super(`Payment intent ${id} not found`, 'PAYMENT_INTENT_NOT_FOUND');
+    super(`Job intent ${id} not found`, 'JOB_INTENT_NOT_FOUND');
   }
 }
 
-export class PaymentIntentExpiredError extends DomainError {
+export class JobIntentExpiredError extends DomainError {
   constructor(id: string) {
-    super(`Payment intent ${id} has expired`, 'PAYMENT_INTENT_EXPIRED');
+    super(`Job intent ${id} has expired`, 'JOB_INTENT_EXPIRED');
   }
 }
 
-export class PaymentIntentAlreadyFundedError extends DomainError {
+export class JobIntentAlreadyFundedError extends DomainError {
   constructor(id: string) {
-    super(`Payment intent ${id} has already been funded`, 'PAYMENT_INTENT_ALREADY_FUNDED');
+    super(`Job intent ${id} has already been funded`, 'JOB_INTENT_ALREADY_FUNDED');
   }
 }
 
@@ -48,7 +48,7 @@ export class ReplayConflictError extends DomainError {
 }
 
 export class JobAlreadyAdmittedError extends DomainError {
-  constructor(paymentIntentId: string) {
-    super(`Job for payment intent ${paymentIntentId} has already been admitted`, 'JOB_ALREADY_ADMITTED');
+  constructor(jobIntentId: string) {
+    super(`Job for job intent ${jobIntentId} has already been admitted`, 'JOB_ALREADY_ADMITTED');
   }
 }

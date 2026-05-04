@@ -7,13 +7,13 @@ export * from './ports/storage';
 export * from './ports/workers';
 export * from './ports/clock';
 
-export * from './use-cases/payment-intents';
+export * from './use-cases/job-intents';
 export * from './use-cases/admit';
 export * from './use-cases/jobs';
 export * from './use-cases/handle-paid-job-request';
 
-export * from './services/get-or-create-payment-intent';
-export * from './services/admit-funded-job';
+export * from './services/get-or-create-job-intent';
+export * from './services/admit-paid-job';
 export * from './services/handle-paid-job-request';
 export * from './services/job-lifecycle';
 export * from './services/timeout-evaluator';

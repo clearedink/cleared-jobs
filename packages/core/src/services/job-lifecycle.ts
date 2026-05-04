@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IWorkerPort } from '../ports/workers';
 import { IClockPort } from '../ports/clock';
-import { JobId, createExecutionId, createResolutionId } from '../domain/ids';
+import { JobId, createExecutionId, createResolutionId } from '../ids';
 import { AttemptStatus, EscrowState, JobStatus, ResolutionState } from '../domain/statuses';
 import { ExecutionAttempt, JobResult, ResolutionRecord } from '../domain/models';
 import { 
@@ -150,8 +150,6 @@ export async function completeJob(
     await storage.saveResolution(resolution);
     job.resolutionId = resolutionId;
     await storage.saveJob(job);
-
-    // Note: Actual rail-level releaseEscrow happens externally by monitoring RELEASE_PENDING
   }
 
   // 4. Audit & Domain Events
@@ -235,7 +233,7 @@ export async function failJob(
 /**
  * Retrieves the current status of a job.
  */
-export async function getJobStatus(
+export async function getJob(
   query: GetJobStatusQuery,
   storage: IStoragePort
 ): Promise<GetJobStatusResult> {
@@ -253,7 +251,7 @@ export async function getJobStatus(
 /**
  * Retrieves the result of a completed job.
  */
-export async function getJobResult(
+export async function getResult(
   query: GetJobResultQuery,
   storage: IStoragePort
 ): Promise<GetJobResultResult> {
