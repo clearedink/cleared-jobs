@@ -1,84 +1,268 @@
+The file is currently saved in the session's backend execution environment as `cleared-jobs-sdk.md`.
+
+If your interface did not render a downloadable link, it means the frontend you are using does not natively support direct file extraction from this sandbox.
+
+To resolve this immediately without relying on the UI, copy the raw markdown below and save it locally as a `.md` file:
+
+````markdown
 # Cleared Jobs SDK
 
-**Cleared** is a durable, funded-admission and recovery layer for paid asynchronous jobs. It bridges the gap between decentralized payments and long-running computational workloads, ensuring that every paid request is recorded, admitted exactly once, and results in a verifiable, retrievable outcome.
+**Cleared** turns a verified x402 payment into one durable, retry-safe async job.
+
+x402 verifies that payment happened. Cleared records what paid work that payment belongs to, admits it exactly once, tracks execution, and keeps the result recoverable by `JobId`.
 
 ---
 
-## Why Payment is Not Enough
+## The Problem
 
-In many asynchronous systems, payments are treated as simple "events." However, for expensive or mission-critical jobs (like AI batch enrichment or cross-domain data processing), simply receiving a payment signal is insufficient:
+x402 is a strong payment primitive, but payment alone is not enough for long-running work.
 
-1.  **Imperfect Idempotency**: Clients may retry payments or submissions. Without a funded-admission layer, you risk double-charging or double-processing.
-2.  **The "Lost Response" Problem**: If a client disconnects after paying but before the job finishes, the result is often lost. Cleared ensures the result is canonical and retrievable by the job's ID.
-3.  **Unreliable Fulfillment**: Workers can fail or timeout. Cleared enforces a resolution state (Success, Refund, or Manual Review) that is decoupled from the execution state.
-4.  **Auditability**: Every financial state change (escrow hold, release, refund) must be auditable and linked to a specific job identity.
+For simple paid resources, the flow is straightforward:
 
----
+```txt
+request → 402 payment required → pay → retry → response
+```
+````
 
-## Architecture
+That works well for short API calls. But paid async jobs are different:
 
-The Cleared SDK is built as a TypeScript monorepo with a clean hexagonal architecture:
+```txt
+pay → queue job → worker runs → result later
+```
 
--   [`packages/core`](file:///Users/mas/Documents/cleared-jobs/packages/core): The heart of the system. Contains the domain models, status enums, and the `admitFundedJob` orchestration logic.
--   [`packages/payment-x402`](file:///Users/mas/Documents/cleared-jobs/packages/payment-x402): A demo-ready adapter for X402-style payment challenges and proof verification.
--   [`packages/http-402-express`](file:///Users/mas/Documents/cleared-jobs/packages/http-402-express): Thin glue layer providing 402 (Payment Required) and 202 (Accepted) response helpers for Express.
--   [`packages/storage-memory`](file:///Users/mas/Documents/cleared-jobs/packages/storage-memory): A high-fidelity in-memory storage implementation for local development and testing.
--   [`packages/worker-adapter`](file:///Users/mas/Documents/cleared-jobs/packages/worker-adapter): Helpers for workers to report start, success, and failure back to the core.
--   [`examples/basic-seller-api`](file:///Users/mas/Documents/cleared-jobs/examples/basic-seller-api): A complete, runnable reference implementation.
+Once work becomes asynchronous, several things can go wrong:
 
----
+- The buyer opens the same paid endpoint twice and receives two unrelated payment requirements.
+- The buyer pays, but the server crashes before returning a jobId.
+- The client retries after payment and accidentally creates a duplicate job.
+- The worker starts but fails halfway through.
+- The original caller disconnects before the result is ready.
+- The seller has no canonical place to track whether the paid work is queued, running, completed, failed, or under manual review.
+
+Most developers patch this together with Redis locks, queue IDs, and custom database rows. Cleared packages that missing layer.
+
+## What Cleared Does
+
+Cleared gives paid async work a durable lifecycle:
+
+```txt
+payment intent → funded admission → durable job → worker execution → result recovery
+```
+
+It handles three important moments:
+
+- **Before payment:** Cleared creates or reuses a stable payment intent for the requested job.
+- **After payment:** Cleared attaches the verified x402 payment to that intent and admits exactly one durable `JobId`.
+- **During execution:** Cleared tracks job status, worker attempts, completion, failure, and result retrieval.
+
+The core idea:
+
+1. x402 verifies payment.
+2. Cleared turns that paid intent into one durable async job.
+
+## Quick Example
+
+### Paid Route
+
+Use `handlePaidJobRequest()` inside the endpoint that requires payment.
+
+```typescript
+const result = await cleared.handlePaidJobRequest({
+  idempotencyKey: req.header("Idempotency-Key"),
+
+  buyerKey: req.body.agentId,
+  jobType: "quest_submission",
+  inputHash,
+
+  price: {
+    amount: "0.05",
+    currency: "USDC",
+    network: "solana-devnet",
+  },
+
+  payload: {
+    questId,
+    agentId,
+    submissionUrl,
+  },
+
+  payment: req.x402?.payment,
+
+  enqueue: async ({ jobId }) => {
+    await queue.add("quest_submission", { jobId });
+  },
+});
+
+if (result.type === "payment_required") {
+  return res.status(402).json(result.paymentRequirement);
+}
+
+return res.status(202).json({
+  jobId: result.jobId,
+  status: result.status,
+  resultUrl: `/jobs/${result.jobId}/result`,
+});
+```
+
+### Worker
+
+Workers can update the same durable job record from anywhere in the project.
+
+```typescript
+export async function processJob(jobId: string) {
+  await cleared.startJob(jobId);
+
+  try {
+    const job = await cleared.getJob(jobId);
+
+    if (!job) {
+      throw new Error("Job not found");
+    }
+
+    const result = await runWork(job.payload);
+
+    await cleared.completeJob(jobId, {
+      result,
+    });
+  } catch (error) {
+    await cleared.failJob(jobId, {
+      reason: error instanceof Error ? error.message : "Unknown error",
+      resolution: "manual_review",
+    });
+  }
+}
+```
+
+### Status Endpoint
+
+```typescript
+app.get("/jobs/:jobId", async (req, res) => {
+  const job = await cleared.getJob(req.params.jobId);
+
+  if (!job) {
+    return res.status(404).json({ error: "Job not found" });
+  }
+
+  return res.json(job);
+});
+```
+
+### Result Endpoint
+
+```typescript
+app.get("/jobs/:jobId/result", async (req, res) => {
+  const result = await cleared.getResult(req.params.jobId);
+
+  if (!result) {
+    return res.status(404).json({
+      error: "Result not available",
+    });
+  }
+
+  return res.json(result);
+});
+```
+
+## Core API
+
+| Function                 | Purpose                                                                                                             |
+| :----------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| `handlePaidJobRequest()` | Main paid-route helper. Creates or reuses a payment intent before payment and admits one durable job after payment. |
+| `admitFundedJob()`       | Lower-level helper for admitting a job after an x402 payment has already been verified.                             |
+| `startJob()`             | Marks a job as running.                                                                                             |
+| `completeJob()`          | Marks a job as completed and stores the result.                                                                     |
+| `failJob()`              | Marks a job as failed and records the resolution path.                                                              |
+| `getJob()`               | Loads the current job state.                                                                                        |
+| `getResult()`            | Loads the final result for a completed job.                                                                         |
+
+Full function signatures and type definitions live in `docs/api.md`.
 
 ## The Happy Path
 
-1.  **Request**: Client calls `POST /v1/jobs/run`.
-2.  **Quote**: Core generates a `Quote` and a deterministic input hash.
-3.  **402 Response**: Service returns a `402 Payment Required` with an X402 challenge and a `paymentIdentifier`.
-4.  **Funded Retry**: Client pays and retries the same endpoint with a `payment_proof`.
-5.  **Exactly Once Admission**: Core verifies the proof, locks the `paymentIdentifier`, and admits exactly one `JobId`.
-6.  **Worker Run**: The worker picks up the job and reports progress via the callback client.
-7.  **Result Retrieval**: Client polls `GET /v1/jobs/:jobId/result` to retrieve the final output.
+1. **Request:** Client calls a paid async endpoint with an `Idempotency-Key`.
+2. **Intent:** Cleared creates or reuses a stable payment intent for the requested job.
+3. **402 Response:** The service returns a `402 Payment Required` response tied to that intent.
+4. **Funded Retry:** The client pays through x402 and retries the request with payment proof.
+5. **Funded Admission:** Cleared attaches the verified payment to the intent and admits exactly one `JobId`.
+6. **Worker Run:** A worker picks up the job and reports progress.
+7. **Result Retrieval:** The client polls `GET /jobs/:jobId/result` to retrieve the final output.
 
----
+## Architecture
 
-## Hard Invariants
+The Cleared SDK is a TypeScript monorepo.
 
-Cleared enforces these rules strictly at the core level:
--   **Invariant 1**: One `paymentIdentifier` admits at most one `Job`.
--   **Invariant 2**: One `JobId` is the persistent, canonical identity for all post-payment actions.
--   **Invariant 3**: Retries produce new `Attempts`, but never a new funded `Job`.
--   **Invariant 4**: Results are immutable once stored and remain retrievable even if the original caller has disappeared.
--   **Invariant 5**: Financial resolution (Escrow) is queryable and manageable independently from worker status.
--   **Invariant 6**: Every terminal or operator-driven action produces a permanent audit log.
+- `packages/core`: Domain models, status enums, admission logic, job lifecycle functions.
+- `packages/x402`: Thin adapter that maps verified x402 payments into Cleared payment objects.
+- `packages/http-402-express`: Express helpers for returning 402 payment requirements and 202 accepted responses.
+- `packages/storage-memory`: In-memory storage for local development and tests.
+- `packages/worker-adapter`: Helpers for workers to report start, completion, and failure.
+- `examples/basic-seller-api`: Runnable reference implementation.
 
----
+Cleared is designed so the core does not depend on one HTTP framework, queue, or payment implementation.
+
+Recommended production shape:
+
+```txt
+official x402 library / facilitator
+        ↓
+Cleared payment intent + funded admission
+        ↓
+durable storage
+        ↓
+queue / worker
+        ↓
+status + result retrieval
+```
+
+## Hard Rules
+
+Cleared is built around a few rules that should remain true during retries, crashes, and worker failures.
+
+- **One intent, one paid job:** The same `intentId` cannot create multiple funded jobs.
+- **One payment, one admission:** The same verified x402 payment cannot admit more than one `JobId`.
+- **Stable job identity:** Once admitted, the `JobId` is the canonical handle for status, attempts, result retrieval, and recovery.
+- **Retry-safe behavior:** Repeated calls return the existing intent or job instead of creating duplicates.
+- **Recoverable results:** Once a result is stored, it remains retrievable by `JobId`.
+- **Separate payment and execution state:** Payment verification and settlement are tracked separately from job execution status.
+- **Auditable terminal actions:** Completion, failure, manual review, and refund decisions are recorded as events.
 
 ## Demo Scripts
 
-We include several scripts to exercise the system's durability:
--   `npm run demo:happy`: Standard end-to-end success.
--   `npm run demo:retry`: Proves that duplicate submissions return the same `jobId`.
--   `npm run demo:lost`: Simulates caller disconnection and later result retrieval.
--   `npm run demo:timeout`: Shows how overdue jobs move to automated refund/manual review.
+The repository includes demo scripts to exercise the durability model.
 
----
+- `npm run demo:happy` - Standard end-to-end success.
+- `npm run demo:retry` - Proves duplicate paid submissions return the same jobId.
+- `npm run demo:lost` - Simulates caller disconnection and later result retrieval.
+- `npm run demo:timeout` - Shows how overdue jobs can move to refund or manual review.
 
 ## Known Limitations
 
--   **Demo Mode Only**: The provided storage and payment adapters are for local development and lack production-grade security signatures.
--   **Single Process Control**: The admission lock in `storage-memory` is suited for single-node environments.
--   **No Scheduler**: Workers are triggered via a simple callback; a production setup would use a persistent job queue (e.g., BullMQ).
+Cleared is currently demo-oriented.
 
----
+- **Storage is not production-grade yet:** `storage-memory` is for local development and tests only.
+- **Single-process admission is not enough for production:** Production deployments should use durable storage with database-level uniqueness constraints.
+- **No production scheduler yet:** Workers are triggered through simple callbacks in the demo. A production setup should use a persistent queue such as BullMQ, SQS, Cloud Tasks, or another durable worker system.
+- **x402 verification should come from official libraries:** Cleared should not replace official x402 payment libraries or facilitators.
+- **Refund and settlement behavior is application-specific:** Cleared can track resolution state, but actual refund/settlement execution depends on the payment scheme and application policy.
 
 ## Out of Scope
 
-Cleared is **not**:
--   A general-purpose X402 payment platform.
--   A wallet provisioning service or treasury management system.
--   A browser automation or data scraping fleet.
--   A customer-facing dashboard for job management.
+Cleared is not:
 
----
+- A general-purpose x402 payment platform.
+- A wallet provisioning service.
+- A treasury management system.
+- A browser automation or data scraping fleet.
+- A customer-facing dashboard for job management.
+- A replacement for official x402 libraries.
+- A replacement for a production queue.
+
+Cleared focuses on one layer: **paid async job admission, execution state, and result recovery.**
 
 ## License
-MIT
+
+See LICENSE.
+
+```
+
+```
