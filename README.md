@@ -1,10 +1,3 @@
-The file is currently saved in the session's backend execution environment as `cleared-jobs-sdk.md`.
-
-If your interface did not render a downloadable link, it means the frontend you are using does not natively support direct file extraction from this sandbox.
-
-To resolve this immediately without relying on the UI, copy the raw markdown below and save it locally as a `.md` file:
-
-````markdown
 # Cleared Jobs SDK
 
 **Cleared** turns a verified x402 payment into one durable, retry-safe async job.
@@ -22,7 +15,6 @@ For simple paid resources, the flow is straightforward:
 ```txt
 request → 402 payment required → pay → retry → response
 ```
-````
 
 That works well for short API calls. But paid async jobs are different:
 
@@ -156,15 +148,15 @@ app.get("/jobs/:jobId/result", async (req, res) => {
 
 ## Core API
 
-| Function                 | Purpose                                                                                                             |
-| :----------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| `getOrCreatePaymentIntent()` | Main paid-route helper. Creates or reuses a stable payment intent before payment. |
-| `admitFundedJob()`       | Lower-level helper for admitting a job after an x402 payment has already been verified.                             |
-| `startJob()`             | Marks a job as running.                                                                                             |
-| `completeJob()`          | Marks a job as completed and stores the result.                                                                     |
-| `failJob()`              | Marks a job as failed and records the resolution path.                                                              |
-| `getJob()`               | Loads the current job state.                                                                                        |
-| `getResult()`            | Loads the final result for a completed job.                                                                         |
+| Function                     | Purpose                                                                                 |
+| :--------------------------- | :-------------------------------------------------------------------------------------- |
+| `getOrCreatePaymentIntent()` | Main paid-route helper. Creates or reuses a stable payment intent before payment.       |
+| `admitFundedJob()`           | Lower-level helper for admitting a job after an x402 payment has already been verified. |
+| `startJob()`                 | Marks a job as running.                                                                 |
+| `completeJob()`              | Marks a job as completed and stores the result.                                         |
+| `failJob()`                  | Marks a job as failed and records the resolution path.                                  |
+| `getJob()`                   | Loads the current job state.                                                            |
+| `getResult()`                | Loads the final result for a completed job.                                             |
 
 Full function signatures and type definitions live in `docs/api.md`.
 
@@ -251,7 +243,3 @@ Cleared focuses on one layer: **paid async job admission, execution state, and r
 ## License
 
 See LICENSE.
-
-```
-
-```
