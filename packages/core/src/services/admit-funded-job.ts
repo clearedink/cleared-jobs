@@ -1,14 +1,11 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
-import { IPaymentPort } from '../ports/payments';
 import { IClockPort } from '../ports/clock';
 import { AdmitFundedJobCommand, AdmitFundedJobResult } from '../use-cases/admit';
 import { EscrowState, JobStatus, PaymentIntentStatus } from '../domain/statuses';
 import { createJobId, createPaymentId } from '../domain/ids';
 import { hashInputs } from '../lib/hash-input';
 import {
-  InvalidPaymentProofError,
-  PaymentIdentifierMismatchError,
   PaymentIntentAlreadyFundedError,
   PaymentIntentExpiredError,
   PaymentIntentNotFoundError,
@@ -19,7 +16,6 @@ import { Job, PaymentRecord } from '../domain/models';
 export async function admitFundedJob(
   command: AdmitFundedJobCommand,
   storage: IStoragePort,
-  payments: IPaymentPort,
   clock: IClockPort
 ): Promise<AdmitFundedJobResult> {
   // 1. Load the intent and validate
@@ -38,19 +34,9 @@ export async function admitFundedJob(
     throw new PaymentIntentExpiredError(command.paymentIntentId);
   }
 
-  // 2. Verify payment proof through payment adapter
-  const verification = await payments.verifyProof(command.paymentProof);
-  if (!verification.verified) {
-    throw new InvalidPaymentProofError(command.paymentIdentifier);
-  }
-
-  if (verification.paymentIdentifier !== command.paymentIdentifier) {
-    throw new PaymentIdentifierMismatchError(command.paymentIdentifier, verification.paymentIdentifier);
-  }
-
-  // 3. Use storage lock for atomicity
+  // 2. Use storage lock for atomicity
   return await storage.withPaymentIdentifierLock(command.paymentIdentifier, async () => {
-    // 4. Check if a job already exists for this paymentIdentifier (Idempotency)
+    // 3. Check if a job already exists for this paymentIdentifier (Idempotency)
     const existingJob = await storage.getJobByPaymentIdentifier(command.paymentIdentifier);
 
     if (existingJob) {
@@ -65,28 +51,28 @@ export async function admitFundedJob(
       }
     }
 
-    // 5. Create immutable payment record
+    // 4. Create immutable payment record
     const paymentRecord: PaymentRecord = {
       id: createPaymentId(randomUUID()),
       paymentIntentId: intent.id,
       paymentIdentifier: command.paymentIdentifier,
-      amount: intent.priceAmount,
-      currency: intent.priceCurrency,
+      amount: command.amount,
+      currency: command.currency,
       escrowState: EscrowState.HELD,
       paymentRail: 'UNKNOWN',
       metadata: {
-        paymentProof: command.paymentProof,
+        ...(command.paymentMetadata || {}),
         verifiedAt: clock.now().toISOString(),
       },
       createdAt: clock.now(),
       updatedAt: clock.now(),
     };
 
-    // 6. Mark intent as funded
+    // 5. Mark intent as funded
     intent.status = PaymentIntentStatus.FUNDED;
     await storage.savePaymentIntent(intent);
 
-    // 7. Create funded job
+    // 6. Create admitted job
     const template = await storage.getTemplate(intent.templateId);
     const deadlineAt = new Date(clock.now().getTime() + (template?.slaSeconds || 60) * 1000);
     
@@ -108,11 +94,11 @@ export async function admitFundedJob(
     await storage.savePayment(paymentRecord);
     await storage.saveJob(job);
 
-    // 8. Append Audit Events
+    // 7. Append Audit Events
     await storage.saveAuditLog({
       id: randomUUID(),
       timestamp: clock.now(),
-      action: 'PAYMENT_VERIFIED',
+      action: 'PAYMENT_ADMITTED',
       actor: 'SYSTEM',
       resourceType: 'PAYMENT',
       resourceId: paymentRecord.id,
@@ -130,16 +116,6 @@ export async function admitFundedJob(
       payload: { paymentIntentId: intent.id },
       metadata: {},
     });
-
-    // 9. Append Domain Event
-    await storage.saveDomainEvent({
-      id: randomUUID(),
-      timestamp: clock.now(),
-      type: 'JOB_ADMITTED',
-      aggregateId: job.id,
-      jobId: job.id,
-      paymentIntentId: intent.id,
-    } as any);
 
     return {
       jobId: job.id,

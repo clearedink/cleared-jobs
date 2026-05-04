@@ -76,7 +76,7 @@ const payments = new MockX402Adapter({
   asset: 'USDC'
 });
 
-const callbackClient = new CallbackClient(storage, payments, clock);
+const callbackClient = new CallbackClient(storage, clock);
 const fakeWorker = new FakeWorker(callbackClient);
 
 const workerPort = {
@@ -115,7 +115,34 @@ app.post('/v1/jobs/run', async (req, res, next) => {
 
   try {
     const inputHash = hashInputs(JOB_TYPE, inputs || {});
+    
+    // 1. In this new decoupled model, the application layer (Seller API) 
+    // is responsible for orchestrating the payment adapter.
+    
+    // Generate a payment requirement (using mock adapter)
+    const requirement = await payments.createIntent({
+      id: idempotency_key || randomUUID(),
+      priceAmount: 1000000n,
+      priceCurrency: 'USDC'
+    } as any);
 
+    // 2. If a payment proof was provided, verify it first
+    let verifiedPayment = undefined;
+    if (payment_proof) {
+      const verification = await payments.verifyProof(payment_proof);
+      if (verification.verified) {
+        verifiedPayment = {
+          paymentIdentifier: verification.paymentIdentifier,
+          amount: verification.amount,
+          currency: verification.currency,
+          metadata: { source: 'seller-api-verification' }
+        };
+      } else {
+        return sendError(res, 400, 'INVALID_PAYMENT_PROOF', 'The provided payment proof is invalid.');
+      }
+    }
+
+    // 3. Call the headline API with pre-verified data
     const result = await handlePaidJobRequest(
       {
         idempotencyKey: idempotency_key || randomUUID(),
@@ -124,17 +151,16 @@ app.post('/v1/jobs/run', async (req, res, next) => {
         inputHash,
         price: { amount: '1000000', currency: 'USDC' },
         payload: inputs || {},
-        payment: payment_proof ? {
-          paymentIdentifier: payment_identifier,
-          paymentProof: payment_proof
-        } : undefined,
+        paymentRequirement: {
+          paymentIdentifier: requirement.paymentIdentifier,
+          clientConfig: requirement.clientConfig
+        },
+        verifiedPayment,
         enqueue: async ({ jobId }) => {
-          // Trigger the fake worker dispatcher
           await dispatchJob(jobId, storage, workerPort, clock);
         }
       },
       storage,
-      payments,
       clock
     );
 

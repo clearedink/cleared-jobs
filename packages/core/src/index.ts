@@ -4,7 +4,6 @@ export * from './domain/models';
 export * from './domain/events';
 
 export * from './ports/storage';
-export * from './ports/payments';
 export * from './ports/workers';
 export * from './ports/clock';
 

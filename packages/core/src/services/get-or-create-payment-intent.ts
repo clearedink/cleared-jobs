@@ -1,119 +1,81 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
-import { IPaymentPort } from '../ports/payments';
 import { IClockPort } from '../ports/clock';
-import { GetOrCreatePaymentIntentCommand, GetOrCreatePaymentIntentResult } from '../use-cases/payment-intents';
-import { EscrowState, PaymentIntentStatus } from '../domain/statuses';
-import { createPaymentId, createPaymentIntentId, createJobTemplateId } from '../domain/ids';
+import { 
+  GetOrCreatePaymentIntentCommand, 
+  GetOrCreatePaymentIntentResult 
+} from '../use-cases/payment-intents';
+import { PaymentIntentStatus } from '../domain/statuses';
+import { createPaymentIntentId } from '../domain/ids';
 import { TemplateNotFoundError } from '../lib/errors';
 import { PaymentIntent } from '../domain/models';
 
 export async function getOrCreatePaymentIntent(
   command: GetOrCreatePaymentIntentCommand,
   storage: IStoragePort,
-  payments: IPaymentPort,
   clock: IClockPort
 ): Promise<GetOrCreatePaymentIntentResult> {
-  // 1. Load the active job template by type
-  // Note: For now we assume templateId matches jobType or we find it by name
-  const templateId = createJobTemplateId(command.jobType);
-  const template = await storage.getTemplate(templateId);
+  // 1. Load template first to get templateId
+  const template = await storage.getTemplateByJobType(command.jobType);
   if (!template) {
-    throw new TemplateNotFoundError(templateId);
+    throw new TemplateNotFoundError(command.jobType);
   }
 
-  // 2. Check for an existing valid intent to ensure idempotency
-  // We use jobType + inputHash as the stable lookup
+  // 2. Check for existing intent by input hash + templateId
   const existingIntent = await storage.findPaymentIntentByInputHash(template.id, command.inputHash);
   
-  if (existingIntent && existingIntent.status === PaymentIntentStatus.OPEN && existingIntent.expiresAt > clock.now()) {
-    const paymentRecord = await storage.getPaymentByPaymentIntentId(existingIntent.id);
-    if (paymentRecord) {
+  if (existingIntent) {
+    if (existingIntent.expiresAt > clock.now()) {
       return {
         paymentIntentId: existingIntent.id,
-        paymentRequirement: {
-          paymentIdentifier: paymentRecord.paymentIdentifier,
-          clientConfig: paymentRecord.metadata.clientConfig || {},
-        },
-        expiresAt: existingIntent.expiresAt,
+        paymentRequirement: existingIntent.paymentRequirement,
         price: {
           amount: existingIntent.priceAmount.toString(),
           currency: existingIntent.priceCurrency,
         },
-        slaSeconds: template.slaSeconds,
-        timeoutPolicy: template.timeoutPolicy,
+        expiresAt: existingIntent.expiresAt,
       };
     }
   }
 
-  // 3. Generate new Payment Intent details
-  const paymentIntentId = createPaymentIntentId(randomUUID());
-  const expiresAt = new Date(clock.now().getTime() + 15 * 60 * 1000); // 15 minute default window
+  // 3. Create new Intent
+  const intentId = createPaymentIntentId(randomUUID());
+  const expiresAt = new Date(clock.now().getTime() + 3600 * 1000); // 1 hour default
 
-  const intentModel: PaymentIntent = {
-    id: paymentIntentId,
+  const intent: PaymentIntent = {
+    id: intentId,
     templateId: template.id,
     inputHash: command.inputHash,
     inputs: command.payload,
-    priceAmount: BigInt(command.price.amount),
-    priceCurrency: command.price.currency,
+    priceAmount: template.priceAmount,
+    priceCurrency: template.priceCurrency,
+    paymentRequirement: command.paymentRequirement,
     status: PaymentIntentStatus.OPEN,
     expiresAt,
     createdAt: clock.now(),
   };
 
-  // 4. Ask the payment adapter to create a payment requirement
-  const intentDetails = await payments.createIntent(intentModel);
+  await storage.savePaymentIntent(intent);
 
-  // 5. Persist the intent
-  await storage.savePaymentIntent(intentModel);
-
-  // 6. Persist an initial payment record (linkage)
-  await storage.savePayment({
-    id: createPaymentId(randomUUID()),
-    paymentIntentId: intentModel.id,
-    paymentIdentifier: intentDetails.paymentIdentifier,
-    amount: intentModel.priceAmount,
-    currency: intentModel.priceCurrency,
-    escrowState: EscrowState.NOT_FUNDED,
-    paymentRail: 'UNKNOWN',
-    metadata: {
-      clientConfig: intentDetails.clientConfig,
-      buyerKey: command.buyerKey,
-      idempotencyKey: command.idempotencyKey,
-    },
-    createdAt: clock.now(),
-    updatedAt: clock.now(),
-  });
-
-  // 7. Append a PAYMENT_INTENT_CREATED audit event
+  // 4. Log the intention
   await storage.saveAuditLog({
     id: randomUUID(),
     timestamp: clock.now(),
     action: 'PAYMENT_INTENT_CREATED',
-    actor: command.buyerKey,
-    resourceType: 'PAYMENT_INTENT',
-    resourceId: intentModel.id,
-    payload: {
-      jobType: command.jobType,
-      inputHash: command.inputHash,
-      idempotencyKey: command.idempotencyKey,
-    },
+    actor: 'SYSTEM',
+    resourceType: 'PAYMENT_INTENT' as any,
+    resourceId: intentId,
+    payload: { jobType: command.jobType, idempotencyKey: command.idempotencyKey },
     metadata: {},
   });
 
   return {
-    paymentIntentId: intentModel.id,
-    paymentRequirement: {
-      paymentIdentifier: intentDetails.paymentIdentifier,
-      clientConfig: intentDetails.clientConfig,
-    },
-    expiresAt: intentModel.expiresAt,
+    paymentIntentId: intentId,
+    paymentRequirement: command.paymentRequirement,
     price: {
-      amount: intentModel.priceAmount.toString(),
-      currency: intentModel.priceCurrency,
+      amount: template.priceAmount.toString(),
+      currency: template.priceCurrency,
     },
-    slaSeconds: template.slaSeconds,
-    timeoutPolicy: template.timeoutPolicy,
+    expiresAt,
   };
 }

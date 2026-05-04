@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
-import { IPaymentPort } from '../ports/payments';
 import { EscrowState, JobStatus, ResolutionState } from '../domain/statuses';
 import { createResolutionId } from '../domain/ids';
 import { ResolutionRecord } from '../domain/models';
@@ -11,7 +10,6 @@ import { ResolutionRecord } from '../domain/models';
  */
 export async function evaluateTimeouts(
   storage: IStoragePort,
-  payments: IPaymentPort,
   clock: IClockPort
 ): Promise<number> {
   const activeJobs = await storage.listActiveJobs();
@@ -22,12 +20,12 @@ export async function evaluateTimeouts(
     if (job.deadlineAt < now) {
       console.log(`[TimeoutEvaluator] Job ${job.id} timed out. Policy transition...`);
       
-      // 1. Transition Job Status to REFUND_DUE (New model)
+      // 1. Transition Job Status to REFUND_DUE
       job.status = JobStatus.REFUND_DUE;
       job.updatedAt = now;
       await storage.saveJob(job);
 
-      // 2. Transition Financial State
+      // 2. Transition Financial State to REFUND_PENDING
       const payment = await storage.getPaymentByPaymentIdentifier(job.paymentIdentifier);
       if (payment) {
         payment.escrowState = EscrowState.REFUND_PENDING;
@@ -46,6 +44,8 @@ export async function evaluateTimeouts(
         await storage.saveResolution(resolution);
         job.resolutionId = resolutionId;
         await storage.saveJob(job);
+        
+        // Note: Actual rail-level refundEscrow happens externally by monitoring REFUND_PENDING
       }
 
       // 4. Log Events
@@ -56,17 +56,6 @@ export async function evaluateTimeouts(
         actor: 'SYSTEM',
         resourceType: 'JOB',
         resourceId: job.id,
-        payload: { reason: 'TIMEOUT' },
-        metadata: {}
-      });
-
-      await storage.saveAuditLog({
-        id: randomUUID(),
-        timestamp: now,
-        action: 'REFUND_INITIATED',
-        actor: 'SYSTEM',
-        resourceType: 'PAYMENT',
-        resourceId: job.paymentIdentifier,
         payload: { reason: 'TIMEOUT' },
         metadata: {}
       });

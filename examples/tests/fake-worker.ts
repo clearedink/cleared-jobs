@@ -4,7 +4,6 @@ import {
   completeJob,
   failJob,
   IClockPort,
-  IPaymentPort,
   IStoragePort,
   JobId,
   WorkerJob
@@ -17,7 +16,6 @@ import {
 export class CallbackClient {
   constructor(
     private storage: IStoragePort,
-    private payments: IPaymentPort,
     private clock: IClockPort
   ) {}
 
@@ -33,7 +31,6 @@ export class CallbackClient {
         output,
       },
       this.storage,
-      this.payments,
       this.clock
     );
   }

@@ -1,5 +1,6 @@
 import { JobStatus, PaymentIntentStatus } from '../domain/statuses';
 import { JobId, PaymentIntentId } from '../domain/ids';
+import { PaymentRequirement } from '../domain/models';
 
 export interface HandlePaidJobRequestCommand {
   idempotencyKey: string;
@@ -11,10 +12,22 @@ export interface HandlePaidJobRequestCommand {
     currency: string;
   };
   payload: Record<string, any>;
-  payment?: {
+  
+  /**
+   * Provided by the application layer.
+   */
+  paymentRequirement: PaymentRequirement;
+
+  /**
+   * If provided, it means the application layer has already verified the payment.
+   */
+  verifiedPayment?: {
     paymentIdentifier: string;
-    paymentProof: string;
+    amount: bigint;
+    currency: string;
+    metadata?: Record<string, any>;
   };
+
   enqueue?: (args: { jobId: JobId }) => Promise<void>;
   metadata?: Record<string, any>;
 }
@@ -26,10 +39,7 @@ export type HandlePaidJobRequestResult =
 export interface PaymentRequiredResult {
   type: 'payment_required';
   paymentIntentId: PaymentIntentId;
-  paymentRequirement: {
-    paymentIdentifier: string;
-    clientConfig: Record<string, any>;
-  };
+  paymentRequirement: PaymentRequirement;
   status: PaymentIntentStatus;
   expiresAt: Date;
   price: {

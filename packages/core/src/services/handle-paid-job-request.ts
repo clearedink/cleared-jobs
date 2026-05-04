@@ -1,5 +1,4 @@
 import { IStoragePort } from '../ports/storage';
-import { IPaymentPort } from '../ports/payments';
 import { IClockPort } from '../ports/clock';
 import {
   HandlePaidJobRequestCommand,
@@ -7,12 +6,11 @@ import {
 } from '../use-cases/handle-paid-job-request';
 import { getOrCreatePaymentIntent } from './get-or-create-payment-intent';
 import { admitFundedJob } from './admit-funded-job';
-import { dispatchJob } from './operator-actions'; // Or wherever dispatch is defined
+import { JobStatus, PaymentIntentStatus } from '../domain/statuses';
 
 export async function handlePaidJobRequest(
   command: HandlePaidJobRequestCommand,
   storage: IStoragePort,
-  payments: IPaymentPort,
   clock: IClockPort
 ): Promise<HandlePaidJobRequestResult> {
   // 1. Ensure a stable payment intent exists
@@ -24,34 +22,35 @@ export async function handlePaidJobRequest(
       inputHash: command.inputHash,
       price: command.price,
       payload: command.payload,
+      paymentRequirement: command.paymentRequirement,
     },
     storage,
-    payments,
     clock
   );
 
-  // 2. If no payment provided, return payment requirement
-  if (!command.payment) {
+  // 2. If no payment provided (or not verified), return payment requirement
+  if (!command.verifiedPayment) {
     return {
       type: 'payment_required',
       paymentIntentId: intentResult.paymentIntentId,
       paymentRequirement: intentResult.paymentRequirement,
-      status: 'OPEN' as any, // This should probably come from intentResult if we added it
+      status: PaymentIntentStatus.OPEN,
       expiresAt: intentResult.expiresAt,
       price: intentResult.price,
     };
   }
 
-  // 3. Payment provided -> Admit Job
+  // 3. Payment verified -> Admit Job
   const admission = await admitFundedJob(
     {
       paymentIntentId: intentResult.paymentIntentId,
-      paymentIdentifier: command.payment.paymentIdentifier,
-      paymentProof: command.payment.paymentProof,
+      paymentIdentifier: command.verifiedPayment.paymentIdentifier,
+      amount: command.verifiedPayment.amount,
+      currency: command.verifiedPayment.currency,
+      paymentMetadata: command.verifiedPayment.metadata,
       inputs: command.payload,
     },
     storage,
-    payments,
     clock
   );
 
@@ -64,6 +63,6 @@ export async function handlePaidJobRequest(
     type: admission.replayed ? 'already_accepted' : 'accepted',
     paymentIntentId: intentResult.paymentIntentId,
     jobId: admission.jobId,
-    status: 'FUNDED' as any, // Should be JobStatus.FUNDED
+    status: JobStatus.ADMITTED,
   };
 }

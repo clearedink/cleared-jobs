@@ -60,6 +60,14 @@ describe('Job Lifecycle', () => {
   it('1. getOrCreatePaymentIntent returns paymentIntentId and requirements', async () => {
     const inputs = { foo: 'bar' };
     const inputHash = hashInputs(jobType, inputs);
+    
+    // Simulate application layer generating requirement
+    const requirement = await payments.createIntent({ 
+      id: randomUUID(), 
+      priceAmount: 1000n, 
+      priceCurrency: 'USDC' 
+    } as any);
+
     const result = await getOrCreatePaymentIntent(
       {
         idempotencyKey: 'id-1',
@@ -67,16 +75,18 @@ describe('Job Lifecycle', () => {
         jobType,
         inputHash,
         price: { amount: '1000', currency: 'USDC' },
-        payload: inputs
+        payload: inputs,
+        paymentRequirement: {
+          paymentIdentifier: requirement.paymentIdentifier,
+          clientConfig: requirement.clientConfig
+        }
       },
       storage,
-      payments,
       clock
     );
 
     expect(result.paymentIntentId).toBeDefined();
     expect(result.paymentRequirement.paymentIdentifier).toContain('x402-pt-');
-    expect(result.price.amount).toBe('1000');
   });
 
   it('2. handlePaidJobRequest orchestrates full flow', async () => {
@@ -84,7 +94,14 @@ describe('Job Lifecycle', () => {
     const inputHash = hashInputs(jobType, inputs);
     const idempotencyKey = 'id-2';
 
-    // Step A: Initial request (no payment)
+    // Simulate application layer generating requirement
+    const requirement = await payments.createIntent({ 
+      id: idempotencyKey, 
+      priceAmount: 1000n, 
+      priceCurrency: 'USDC' 
+    } as any);
+
+    // Step A: Initial request (no verified payment)
     const res1 = await handlePaidJobRequest(
       {
         idempotencyKey,
@@ -92,10 +109,13 @@ describe('Job Lifecycle', () => {
         jobType,
         inputHash,
         price: { amount: '1000', currency: 'USDC' },
-        payload: inputs
+        payload: inputs,
+        paymentRequirement: {
+          paymentIdentifier: requirement.paymentIdentifier,
+          clientConfig: requirement.clientConfig
+        }
       },
       storage,
-      payments,
       clock
     );
 
@@ -107,6 +127,15 @@ describe('Job Lifecycle', () => {
 
     // Step B: Retry with payment
     if (res1.type === 'payment_required') {
+      const proof = JSON.stringify({
+        paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
+        signature: 'sig'
+      });
+      
+      // Simulate application layer verifying payment
+      const verification = await payments.verifyProof(proof);
+      expect(verification.verified).toBe(true);
+
       const res2 = await handlePaidJobRequest(
         {
           idempotencyKey,
@@ -115,19 +144,17 @@ describe('Job Lifecycle', () => {
           inputHash,
           price: { amount: '1000', currency: 'USDC' },
           payload: inputs,
-          payment: {
-            paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
-            paymentProof: JSON.stringify({
-              paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
-              signature: 'sig'
-            })
+          paymentRequirement: res1.paymentRequirement,
+          verifiedPayment: {
+            paymentIdentifier: verification.paymentIdentifier,
+            amount: verification.amount,
+            currency: verification.currency
           },
           enqueue: async ({ jobId }) => {
             await mockWorkerPort.dispatch({ jobId });
           }
         },
         storage,
-        payments,
         clock
       );
 
@@ -146,16 +173,14 @@ describe('Job Lifecycle', () => {
           inputHash,
           price: { amount: '1000', currency: 'USDC' },
           payload: inputs,
-          payment: {
-            paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
-            paymentProof: JSON.stringify({
-              paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
-              signature: 'sig'
-            })
+          paymentRequirement: res1.paymentRequirement,
+          verifiedPayment: {
+            paymentIdentifier: verification.paymentIdentifier,
+            amount: verification.amount,
+            currency: verification.currency
           }
         },
         storage,
-        payments,
         clock
       );
       expect(res3.type).toBe('already_accepted');
@@ -165,24 +190,39 @@ describe('Job Lifecycle', () => {
   it('3. successful completion stores one canonical result', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
+    
+    const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
+    
     const intent = await getOrCreatePaymentIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
       inputHash,
       price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
+      payload: inputs,
+      paymentRequirement: {
+        paymentIdentifier: requirement.paymentIdentifier,
+        clientConfig: requirement.clientConfig
+      }
+    }, storage, clock);
 
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
-    const { jobId } = await admitFundedJob({ paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs }, storage, payments, clock);
+    const verification = await payments.verifyProof(proof);
+
+    const { jobId } = await admitFundedJob({ 
+      paymentIntentId: intent.paymentIntentId, 
+      paymentIdentifier: verification.paymentIdentifier, 
+      amount: verification.amount,
+      currency: verification.currency,
+      inputs 
+    }, storage, clock);
     
     const executionId = createExecutionId(randomUUID());
     await storage.saveAttempt({ id: executionId, jobId, status: 'QUEUED' as any, startedAt: clock.now() });
 
     await completeJob(
       { jobId, executionId, output: { result: 'first' } },
-      storage, payments, clock
+      storage, clock
     );
 
     const jobResult = await storage.getResult(jobId);
@@ -192,48 +232,76 @@ describe('Job Lifecycle', () => {
   it('4. timeout evaluator moves overdue jobs toward refund', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
+    const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
+
     const intent = await getOrCreatePaymentIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
       inputHash,
       price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
+      payload: inputs,
+      paymentRequirement: {
+        paymentIdentifier: requirement.paymentIdentifier,
+        clientConfig: requirement.clientConfig
+      }
+    }, storage, clock);
 
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
-    const { jobId } = await admitFundedJob({ paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs }, storage, payments, clock);
+    const verification = await payments.verifyProof(proof);
+
+    await admitFundedJob({ 
+      paymentIntentId: intent.paymentIntentId, 
+      paymentIdentifier: verification.paymentIdentifier, 
+      amount: verification.amount,
+      currency: verification.currency,
+      inputs 
+    }, storage, clock);
 
     const futureClock = {
       now: () => new Date(clock.now().getTime() + 120 * 1000)
     };
 
-    const count = await evaluateTimeouts(storage, payments, futureClock as any);
+    const count = await evaluateTimeouts(storage, futureClock as any);
     expect(count).toBe(1);
 
-    const job = await storage.getJob(jobId);
+    const job = await storage.getJobByPaymentIdentifier(verification.paymentIdentifier);
     expect(job?.status).toBe(JobStatus.REFUND_DUE);
   });
 
   it('5. audit events are emitted for key life cycle steps', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
+    const requirement = await payments.createIntent({ id: randomUUID(), priceAmount: 1000n, priceCurrency: 'USDC' } as any);
+
     const intent = await getOrCreatePaymentIntent({
       idempotencyKey: 'id-1',
       buyerKey: 'u1',
       jobType,
       inputHash,
       price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
+      payload: inputs,
+      paymentRequirement: {
+        paymentIdentifier: requirement.paymentIdentifier,
+        clientConfig: requirement.clientConfig
+      }
+    }, storage, clock);
 
     const proof = JSON.stringify({ paymentIdentifier: intent.paymentRequirement.paymentIdentifier, signature: 'sig' });
-    await admitFundedJob({ paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs }, storage, payments, clock);
+    const verification = await payments.verifyProof(proof);
+
+    await admitFundedJob({ 
+      paymentIntentId: intent.paymentIntentId, 
+      paymentIdentifier: verification.paymentIdentifier, 
+      amount: verification.amount,
+      currency: verification.currency,
+      inputs 
+    }, storage, clock);
 
     const logs: any[] = (storage as any).auditLogs;
     const actions = logs.map(l => l.action);
     expect(actions).toContain('PAYMENT_INTENT_CREATED');
-    expect(actions).toContain('PAYMENT_VERIFIED');
-    expect(actions).toContain('JOB_FUNDED');
+    expect(actions).toContain('PAYMENT_ADMITTED');
+    expect(actions).toContain('JOB_ADMITTED');
   });
 });

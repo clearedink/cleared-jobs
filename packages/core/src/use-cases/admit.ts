@@ -1,10 +1,33 @@
-import { PaymentIntentId, JobId } from '../domain/ids';
+import { JobId, PaymentIntentId } from '../domain/ids';
 
 export interface AdmitFundedJobCommand {
   paymentIntentId: PaymentIntentId;
+  
+  /**
+   * The canonical identifier for the payment (e.g. x402 address).
+   * Assumed to be verified by the application layer.
+   */
   paymentIdentifier: string;
-  paymentProof: string; // The cryptographic or rail-specific proof of payment
-  inputs: Record<string, any>; // Re-submitted for structural verification
+  
+  /**
+   * The payment amount verified by the application layer.
+   */
+  amount: bigint;
+  
+  /**
+   * The payment currency verified by the application layer.
+   */
+  currency: string;
+
+  /**
+   * Optional metadata about the verified payment.
+   */
+  paymentMetadata?: Record<string, any>;
+
+  /**
+   * Re-submitted inputs for structural verification (idempotency).
+   */
+  inputs: Record<string, any>;
 }
 
 export interface AdmitFundedJobResult {

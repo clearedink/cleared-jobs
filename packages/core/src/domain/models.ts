@@ -14,6 +14,11 @@ export interface JobTemplate {
   createdAt: Date;
 }
 
+export interface PaymentRequirement {
+  paymentIdentifier: string;
+  clientConfig: Record<string, any>;
+}
+
 export interface PaymentIntent {
   id: PaymentIntentId;
   templateId: JobTemplateId;
@@ -21,6 +26,7 @@ export interface PaymentIntent {
   inputs: Record<string, any>;
   priceAmount: bigint;
   priceCurrency: string;
+  paymentRequirement: PaymentRequirement;
   status: PaymentIntentStatus;
   expiresAt: Date;
   createdAt: Date;

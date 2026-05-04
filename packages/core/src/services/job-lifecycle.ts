@@ -2,7 +2,6 @@ import { randomUUID } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IWorkerPort } from '../ports/workers';
 import { IClockPort } from '../ports/clock';
-import { IPaymentPort } from '../ports/payments';
 import { JobId, createExecutionId, createResolutionId } from '../domain/ids';
 import { AttemptStatus, EscrowState, JobStatus, ResolutionState } from '../domain/statuses';
 import { ExecutionAttempt, JobResult, ResolutionRecord } from '../domain/models';
@@ -71,7 +70,6 @@ export async function startJob(
   storage: IStoragePort,
   clock: IClockPort
 ): Promise<void> {
-  // If executionId provided, use it. Otherwise find current from job.
   let attemptId = command.executionId;
   if (!attemptId) {
     const job = await storage.getJob(command.jobId);
@@ -95,18 +93,16 @@ export async function startJob(
 }
 
 /**
- * Successfully completes a job and releases payment.
+ * Successfully completes a job and marks payment for release.
  */
 export async function completeJob(
   command: CompleteJobCommand,
   storage: IStoragePort,
-  payments: IPaymentPort,
   clock: IClockPort
 ): Promise<void> {
   const job = await storage.getJob(command.jobId);
   if (!job) throw new Error('Job not found');
 
-  // Invariant: canonical result must not be overwritten
   const existingResult = await storage.getResult(job.id);
   if (existingResult) {
     console.log(`Job ${job.id} already has a canonical result. Ignoring duplicate completion.`);
@@ -155,10 +151,7 @@ export async function completeJob(
     job.resolutionId = resolutionId;
     await storage.saveJob(job);
 
-    // Release money
-    await payments.releaseEscrow(job.paymentIdentifier);
-    payment.escrowState = EscrowState.RELEASED;
-    await storage.savePayment(payment);
+    // Note: Actual rail-level releaseEscrow happens externally by monitoring RELEASE_PENDING
   }
 
   // 4. Audit & Domain Events
