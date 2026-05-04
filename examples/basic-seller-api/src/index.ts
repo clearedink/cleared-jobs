@@ -12,13 +12,69 @@ import {
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
 import { MockX402Adapter } from '@cleared/payment-x402';
-import { 
-  sendPaymentRequired, 
-  sendJobAccepted, 
-  sendJobResult, 
-  clearedErrorHandler,
-  sendError
-} from '@cleared/http-402-express';
+/**
+ * -----------------------------------------------------------------------------
+ * HTTP HELPERS (Inlined helpers)
+ * -----------------------------------------------------------------------------
+ */
+
+/**
+ * Sends a 402 Payment Required response with the quote/challenge details
+ */
+function sendPaymentRequired(res: express.Response, quoteResult: any) {
+  return res.status(402).json({
+    error: 'PAYMENT_REQUIRED',
+    message: 'Payment is required to process this request.',
+    ...quoteResult
+  });
+}
+
+/**
+ * Sends a 202 Accepted response for a job being processed
+ */
+function sendJobAccepted(res: express.Response, jobId: string, replayed: boolean = false) {
+  return res.status(202).json({
+    status: 'ACCEPTED',
+    jobId,
+    replayed,
+    pollUrl: `/jobs/${jobId}/status`
+  });
+}
+
+/**
+ * Formats a successful job result response
+ */
+function sendJobResult(res: express.Response, result: any) {
+  return res.status(200).json({
+    status: 'COMPLETED',
+    ...result
+  });
+}
+
+/**
+ * Sends a standard error response
+ */
+function sendError(res: express.Response, status: number, code: string, message: string) {
+  return res.status(status).json({
+    error: code,
+    message
+  });
+}
+
+/**
+ * Example error handler for DomainErrors
+ */
+function clearedErrorHandler(err: any, req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (err.name === 'DomainError') {
+    return sendError(res, 400, err.code, err.message);
+  }
+  
+  if (err.code === 'QUOTE_EXPIRED') {
+    return sendError(res, 402, 'QUOTE_EXPIRED', err.message);
+  }
+
+  next(err);
+}
 import { CallbackClient, FakeWorker } from '@cleared/worker-adapter';
 
 const app = express();

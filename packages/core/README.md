@@ -22,7 +22,6 @@ Optional adapters:
 
 ```bash
 npm install @cleared/storage-memory
-npm install @cleared/http-402-express
 npm install @cleared/worker-adapter
 npm install @cleared/x402
 ```

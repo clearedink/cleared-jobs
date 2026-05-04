@@ -6,7 +6,7 @@
   "include": ["src"],
   "references": [
     { "path": "../../packages/core" },
-    { "path": "../../packages/http-402-express" },
+
     { "path": "../../packages/payment-x402" },
     { "path": "../../packages/storage-memory" }
   ]

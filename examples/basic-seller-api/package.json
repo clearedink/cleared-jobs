@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@cleared/core": "workspace:*",
-    "@cleared/http-402-express": "workspace:*",
+
     "@cleared/payment-x402": "workspace:*",
     "@cleared/storage-memory": "workspace:*",
     "@cleared/worker-adapter": "workspace:*",
