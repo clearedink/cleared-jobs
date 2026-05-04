@@ -1,22 +1,21 @@
 import express from 'express';
 import { randomUUID } from 'crypto';
 import { 
-  getOrCreatePaymentIntent, 
-  admitFundedJob, 
+  handlePaidJobRequest, 
   getJobStatus, 
   getJobResult,
   SystemClock,
   createJobTemplateId,
   createJobId,
-  createPaymentIntentId,
-  hashInputs
+  hashInputs,
+  dispatchJob
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
 import { MockX402Adapter } from '@cleared/payment-x402';
 
 /**
  * -----------------------------------------------------------------------------
- * HTTP HELPERS (Inlined helpers)
+ * HTTP HELPERS
  * -----------------------------------------------------------------------------
  */
 
@@ -56,7 +55,7 @@ function clearedErrorHandler(err: any, req: express.Request, res: express.Respon
     return sendError(res, 400, err.code, err.message);
   }
   
-  if (err.code === 'QUOTE_EXPIRED' || err.code === 'PAYMENT_INTENT_EXPIRED') {
+  if (err.code === 'PAYMENT_INTENT_EXPIRED') {
     return sendError(res, 402, 'PAYMENT_INTENT_EXPIRED', err.message);
   }
 
@@ -108,52 +107,42 @@ storage.seedTemplates([{
   createdAt: clock.now()
 }]);
 
+/**
+ * Main entry point: POST /v1/jobs/run
+ */
 app.post('/v1/jobs/run', async (req, res, next) => {
   const { payment_proof, payment_identifier, inputs, idempotency_key } = req.body;
 
   try {
     const inputHash = hashInputs(JOB_TYPE, inputs || {});
 
-    // 1. Get or Create Intent
-    if (!payment_proof) {
-      const intentResult = await getOrCreatePaymentIntent(
-        {
-          idempotencyKey: idempotency_key || randomUUID(),
-          buyerKey: 'demo-user-123',
-          jobType: JOB_TYPE,
-          inputHash,
-          price: { amount: '1000000', currency: 'USDC' },
-          payload: inputs || {}
-        },
-        storage,
-        payments,
-        clock
-      );
-      return sendPaymentRequired(res, intentResult);
-    }
-
-    // 2. Admit Job
-    const admission = await admitFundedJob(
+    const result = await handlePaidJobRequest(
       {
-        paymentIntentId: req.body.payment_intent_id as any,
-        paymentIdentifier: payment_identifier,
-        paymentProof: payment_proof,
-        inputs: inputs || {}
+        idempotencyKey: idempotency_key || randomUUID(),
+        buyerKey: 'demo-user-123',
+        jobType: JOB_TYPE,
+        inputHash,
+        price: { amount: '1000000', currency: 'USDC' },
+        payload: inputs || {},
+        payment: payment_proof ? {
+          paymentIdentifier: payment_identifier,
+          paymentProof: payment_proof
+        } : undefined,
+        enqueue: async ({ jobId }) => {
+          // Trigger the fake worker dispatcher
+          await dispatchJob(jobId, storage, workerPort, clock);
+        }
       },
       storage,
       payments,
       clock
     );
 
-    if (!admission.replayed) {
-      // In a real app, this would use a proper worker service
-      const job = await storage.getJob(admission.jobId);
-      if (job) {
-        await workerPort.dispatch(job);
-      }
+    if (result.type === 'payment_required') {
+      return sendPaymentRequired(res, result);
     }
 
-    return sendJobAccepted(res, admission.jobId, admission.replayed);
+    return sendJobAccepted(res, result.jobId, result.type === 'already_accepted');
 
   } catch (err) {
     next(err);
@@ -191,6 +180,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('---------------------------------------------------------');
   console.log(`CLEARED SELLER API RUNNING ON http://localhost:${PORT}`);
-  console.log(`Job Type: ${JOB_TYPE}`);
   console.log('---------------------------------------------------------');
 });

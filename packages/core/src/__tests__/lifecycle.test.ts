@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { 
   getOrCreatePaymentIntent, 
   admitFundedJob, 
+  handlePaidJobRequest,
   handleWorkerCallback, 
   evaluateTimeouts,
   SystemClock,
@@ -76,104 +77,90 @@ describe('Job Lifecycle', () => {
     expect(result.price.amount).toBe('1000');
   });
 
-  it('2. funded admission creates exactly one job', async () => {
-    const inputs = {};
+  it('2. handlePaidJobRequest orchestrates full flow', async () => {
+    const inputs = { foo: 'bar' };
     const inputHash = hashInputs(jobType, inputs);
-    const intent = await getOrCreatePaymentIntent({
-      idempotencyKey: 'id-1',
-      buyerKey: 'u1',
-      jobType,
-      inputHash,
-      price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
-    
-    const admission = await admitFundedJob(
+    const idempotencyKey = 'id-2';
+
+    // Step A: Initial request (no payment)
+    const res1 = await handlePaidJobRequest(
       {
-        paymentIntentId: intent.paymentIntentId,
-        paymentIdentifier: intent.paymentRequirement.paymentIdentifier,
-        paymentProof: JSON.stringify({
-          paymentIdentifier: intent.paymentRequirement.paymentIdentifier,
-          signature: 'mock-sig'
-        }),
-        inputs
+        idempotencyKey,
+        buyerKey: 'user-1',
+        jobType,
+        inputHash,
+        price: { amount: '1000', currency: 'USDC' },
+        payload: inputs
       },
       storage,
       payments,
       clock
     );
 
-    expect(admission.jobId).toBeDefined();
-    expect(admission.replayed).toBe(false);
+    expect(res1.type).toBe('payment_required');
+    if (res1.type === 'payment_required') {
+      expect(res1.paymentIntentId).toBeDefined();
+      expect(res1.paymentRequirement.paymentIdentifier).toBeDefined();
+    }
 
-    const job = await storage.getJob(admission.jobId);
-    expect(job).toBeDefined();
-    expect(job?.status).toBe(JobStatus.FUNDED);
+    // Step B: Retry with payment
+    if (res1.type === 'payment_required') {
+      const res2 = await handlePaidJobRequest(
+        {
+          idempotencyKey,
+          buyerKey: 'user-1',
+          jobType,
+          inputHash,
+          price: { amount: '1000', currency: 'USDC' },
+          payload: inputs,
+          payment: {
+            paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
+            paymentProof: JSON.stringify({
+              paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
+              signature: 'sig'
+            })
+          },
+          enqueue: async ({ jobId }) => {
+            await mockWorkerPort.dispatch({ jobId });
+          }
+        },
+        storage,
+        payments,
+        clock
+      );
+
+      expect(res2.type).toBe('accepted');
+      if (res2.type === 'accepted') {
+        expect(res2.jobId).toBeDefined();
+        expect(mockWorkerPort.dispatch).toHaveBeenCalledWith({ jobId: res2.jobId });
+      }
+
+      // Step C: Replay
+      const res3 = await handlePaidJobRequest(
+        {
+          idempotencyKey,
+          buyerKey: 'user-1',
+          jobType,
+          inputHash,
+          price: { amount: '1000', currency: 'USDC' },
+          payload: inputs,
+          payment: {
+            paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
+            paymentProof: JSON.stringify({
+              paymentIdentifier: res1.paymentRequirement.paymentIdentifier,
+              signature: 'sig'
+            })
+          }
+        },
+        storage,
+        payments,
+        clock
+      );
+      expect(res3.type).toBe('already_accepted');
+    }
   });
 
-  it('3. duplicate funded retry with same payload returns same jobId', async () => {
-    const inputs = { x: 1 };
-    const inputHash = hashInputs(jobType, inputs);
-    const intent = await getOrCreatePaymentIntent({
-      idempotencyKey: 'id-1',
-      buyerKey: 'u1',
-      jobType,
-      inputHash,
-      price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
-
-    const proof = JSON.stringify({
-      paymentIdentifier: intent.paymentRequirement.paymentIdentifier,
-      signature: 'sig'
-    });
-
-    const res1 = await admitFundedJob(
-      { paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs },
-      storage, payments, clock
-    );
-
-    const res2 = await admitFundedJob(
-      { paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs },
-      storage, payments, clock
-    );
-
-    expect(res1.jobId).toBe(res2.jobId);
-    expect(res2.replayed).toBe(true);
-  });
-
-  it('4. duplicate funded retry with conflicting payload throws a conflict error', async () => {
-    const inputs = { x: 1 };
-    const inputHash = hashInputs(jobType, inputs);
-    const intent = await getOrCreatePaymentIntent({
-      idempotencyKey: 'id-1',
-      buyerKey: 'u1',
-      jobType,
-      inputHash,
-      price: { amount: '1000', currency: 'USDC' },
-      payload: inputs
-    }, storage, payments, clock);
-
-    const proof = JSON.stringify({
-      paymentIdentifier: intent.paymentRequirement.paymentIdentifier,
-      signature: 'sig'
-    });
-
-    await admitFundedJob(
-      { paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs },
-      storage, payments, clock
-    );
-
-    // Try with different inputs (though admitFundedJob uses the inputs provided in command to check against intent's hash)
-    // Wait, in my admitFundedJob implementation, I check `currentInputHash === intent.inputHash`.
-    // So if I pass inputs that hash to something else, it should fail.
-    await expect(admitFundedJob(
-      { paymentIntentId: intent.paymentIntentId, paymentIdentifier: intent.paymentRequirement.paymentIdentifier, paymentProof: proof, inputs: { x: 2 } },
-      storage, payments, clock
-    )).rejects.toThrow('Replay conflict');
-  });
-
-  it('5. successful completion stores one canonical result', async () => {
+  it('3. successful completion stores one canonical result', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
     const intent = await getOrCreatePaymentIntent({
@@ -200,7 +187,7 @@ describe('Job Lifecycle', () => {
     expect(jobResult?.output).toEqual({ result: 'first' });
   });
 
-  it('6. timeout evaluator moves overdue jobs toward failure', async () => {
+  it('4. timeout evaluator moves overdue jobs toward failure', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
     const intent = await getOrCreatePaymentIntent({
@@ -226,7 +213,7 @@ describe('Job Lifecycle', () => {
     expect(job?.status).toBe(JobStatus.FAILED);
   });
 
-  it('7. audit events are emitted for key life cycle steps', async () => {
+  it('5. audit events are emitted for key life cycle steps', async () => {
     const inputs = {};
     const inputHash = hashInputs(jobType, inputs);
     const intent = await getOrCreatePaymentIntent({

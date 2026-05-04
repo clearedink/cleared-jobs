@@ -11,9 +11,11 @@ export * from './ports/clock';
 export * from './use-cases/payment-intents';
 export * from './use-cases/admit';
 export * from './use-cases/jobs';
+export * from './use-cases/handle-paid-job-request';
 
 export * from './services/get-or-create-payment-intent';
 export * from './services/admit-funded-job';
+export * from './services/handle-paid-job-request';
 export * from './services/get-job-status';
 export * from './services/get-job-result';
 export * from './services/worker-callbacks';
