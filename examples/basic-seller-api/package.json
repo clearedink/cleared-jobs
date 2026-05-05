@@ -9,9 +9,9 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@cleared/core": "workspace:*",
-    "@cleared/x402-mock": "workspace:*",
-    "@cleared/storage-memory": "workspace:*",
+    "@clearedink/core": "workspace:*",
+    "@clearedink/x402-mock": "workspace:*",
+    "@clearedink/storage-memory": "workspace:*",
     "express": "^4.18.0"
   },
   "devDependencies": {

@@ -1,8 +1,8 @@
 import express from "express";
 import { randomUUID } from "crypto";
-import { createCleared, SystemClock, hashJobInput } from "@cleared/core";
-import { MemoryStorage } from "@cleared/storage-memory";
-import { MockX402Adapter } from "@cleared/x402-mock";
+import { createCleared, SystemClock, hashJobInput } from "@clearedink/core";
+import { MemoryStorage } from "@clearedink/storage-memory";
+import { MockX402Adapter } from "@clearedink/x402-mock";
 
 function sendPaymentRequired(res: express.Response, result: any) {
   return res.status(402).json({

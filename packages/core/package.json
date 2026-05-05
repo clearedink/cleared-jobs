@@ -1,5 +1,5 @@
 {
-  "name": "@cleared/core",
+  "name": "@clearedink/core",
   "version": "0.1.0",
   "description": "Durable job lifecycle for x402-paid async work",
   "type": "module",

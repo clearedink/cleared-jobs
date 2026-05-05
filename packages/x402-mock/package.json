@@ -1,5 +1,5 @@
 {
-  "name": "@cleared/x402-mock",
+  "name": "@clearedink/x402-mock",
   "version": "0.1.0",
   "description": "Mock x402 adapter for Cleared demos and local development",
   "type": "module",
@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cleared/core": "0.1.0",
+    "@clearedink/core": "0.1.0",
     "zod": "^3.0.0"
   },
   "publishConfig": {

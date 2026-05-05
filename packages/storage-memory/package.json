@@ -1,5 +1,5 @@
 {
-  "name": "@cleared/storage-memory",
+  "name": "@clearedink/storage-memory",
   "version": "0.1.0",
   "description": "In-memory storage adapter for Cleared",
   "type": "module",
@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cleared/core": "0.1.0"
+    "@clearedink/core": "0.1.0"
   },
   "publishConfig": {
     "access": "public"

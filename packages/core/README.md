@@ -15,14 +15,14 @@ The main API is `handlePaidJobRequest()`. Lower-level APIs are available when ap
 ## Installation
 
 ```bash
-npm install @cleared/core
+npm install @clearedink/core
 ```
 
 Optional adapters:
 
 ```bash
-npm install @cleared/storage-memory
-npm install @cleared/x402
+npm install @clearedink/storage-memory
+npm install @clearedink/x402
 ```
 
 ---
@@ -30,8 +30,8 @@ npm install @cleared/x402
 ## Creating a Cleared Client
 
 ```ts
-import { createCleared } from "@cleared/core";
-import { createMemoryStorage } from "@cleared/storage-memory";
+import { createCleared } from "@clearedink/core";
+import { createMemoryStorage } from "@clearedink/storage-memory";
 
 export const cleared = createCleared({
   storage: createMemoryStorage(),

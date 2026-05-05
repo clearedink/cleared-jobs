@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { randomUUID } from "crypto";
 import { createCleared, SystemClock, hashJobInput } from "../index.js";
-import { MemoryStorage } from "@cleared/storage-memory";
-import { MockX402Adapter } from "@cleared/x402-mock";
+import { MemoryStorage } from "@clearedink/storage-memory";
+import { MockX402Adapter } from "@clearedink/x402-mock";
 
 describe("Job Lifecycle via Cleared Client", () => {
   let storage: MemoryStorage;
@@ -55,7 +55,7 @@ describe("Job Lifecycle via Cleared Client", () => {
         price: { amount: "1000", currency: "USDC", network: "test" },
         payload: inputs,
       },
-      async (intent) => payments.createMockPaymentRequirement(intent)
+      async (intent) => payments.createMockPaymentRequirement(intent),
     );
 
     expect(res1.type).toBe("payment_required");
@@ -71,7 +71,7 @@ describe("Job Lifecycle via Cleared Client", () => {
           signature: "mock-sig",
           transactionHash: "0xMockTx",
         },
-        { amount: "1000", currency: "USDC", network: "test" }
+        { amount: "1000", currency: "USDC", network: "test" },
       );
 
       const res2 = await cleared.handlePaidJobRequest({
