@@ -3,11 +3,8 @@ import { randomUUID } from 'crypto';
 import { 
   createCleared,
   SystemClock,
-  createJobTemplateId,
-  JobStatus,
   hashInputs
 } from '../index';
-import { evaluateTimeouts } from '../services/timeout-evaluator';
 import { MemoryStorage } from '../../../storage-memory/src/memory-storage';
 import { MockX402Adapter } from '../../../payment-x402/src/mock-x402-adapter';
 
@@ -17,7 +14,6 @@ describe('Job Lifecycle via Cleared Client', () => {
   let clock: SystemClock;
   let cleared: ReturnType<typeof createCleared>;
   const jobType = 'test-job';
-  const templateId = createJobTemplateId(jobType);
 
   beforeEach(async () => {
     storage = new MemoryStorage();
@@ -29,19 +25,6 @@ describe('Job Lifecycle via Cleared Client', () => {
     clock = new SystemClock();
 
     cleared = createCleared({ storage, clock });
-
-    // Seed a template
-    await storage.seedTemplates([{
-      id: templateId,
-      name: 'Test Template',
-      priceAmount: 1000n,
-      priceCurrency: 'USDC',
-      inputSchema: {},
-      outputSchema: {},
-      slaSeconds: 60,
-      timeoutPolicy: 'REFUND',
-      createdAt: new Date()
-    }]);
   });
 
   it('1. getOrCreateJobIntent returns job intent record', async () => {

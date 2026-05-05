@@ -1,15 +1,9 @@
-import { JobStatus } from './statuses';
+import { JobStatus } from '../domain/statuses';
 
 export class DomainError extends Error {
   constructor(message: string, public code: string) {
     super(message);
     this.name = 'DomainError';
-  }
-}
-
-export class TemplateNotFoundError extends DomainError {
-  constructor(templateId: string) {
-    super(`Job template ${templateId} not found`, 'TEMPLATE_NOT_FOUND');
   }
 }
 

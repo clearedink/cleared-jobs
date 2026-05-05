@@ -1,5 +1,4 @@
-import { AttemptStatus, EscrowState, JobStatus, JobIntentStatus, ResolutionState, JobFailureResolution } from './statuses';
-import { ExecutionId, JobId, JobTemplateId, ResolutionId } from './ids';
+import { JobStatus, JobIntentStatus, JobFailureResolution } from './statuses';
 
 // -----------------------------------------------------------------------------
 // Public API Types from README
@@ -76,38 +75,3 @@ export type EnqueueArgs = {
   jobType: string;
   payload: Record<string, unknown>;
 };
-
-// -----------------------------------------------------------------------------
-// Internal Engine Types (Not in public API README but used internally)
-// -----------------------------------------------------------------------------
-
-export interface JobTemplate {
-  id: JobTemplateId;
-  name: string;
-  description?: string;
-  priceAmount: bigint;
-  priceCurrency: string;
-  inputSchema: any;
-  outputSchema: any;
-  slaSeconds: number;
-  timeoutPolicy: 'REFUND' | 'RETRY' | 'MANUAL';
-  createdAt: Date;
-}
-
-export interface ExecutionAttempt {
-  id: ExecutionId;
-  jobId: JobId;
-  status: AttemptStatus;
-  workerId?: string;
-  startedAt?: Date;
-  finishedAt?: Date;
-  error?: string;
-}
-
-export interface ResolutionRecord {
-  id: ResolutionId;
-  jobId: JobId;
-  state: ResolutionState;
-  resolvedAt: Date;
-  resolutionMetadata: Record<string, any>;
-}

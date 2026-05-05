@@ -1,42 +1,21 @@
 import {
-  ExecutionAttempt,
-  ExecutionId,
   IStoragePort,
   JobRecord,
   JobId,
   JobResult,
-  JobTemplate,
-  JobTemplateId,
   JobIntentRecord,
   JobIntentId,
-  ResolutionId,
-  ResolutionRecord,
   DomainEvent,
 } from '@cleared/core';
 
 export class MemoryStorage implements IStoragePort {
-  private templates = new Map<JobTemplateId, JobTemplate>();
   private jobIntents = new Map<JobIntentId, JobIntentRecord>();
   private jobs = new Map<JobId, JobRecord>();
-  private attempts = new Map<ExecutionId, ExecutionAttempt>();
   private results = new Map<JobId, JobResult>();
-  private resolutions = new Map<ResolutionId, ResolutionRecord>();
   private domainEvents: DomainEvent[] = [];
   private auditLogs: any[] = [];
 
   private admissionLocks = new Set<string>();
-
-  async getTemplate(id: JobTemplateId): Promise<JobTemplate | null> {
-    return this.templates.get(id) || null;
-  }
-
-  async getTemplateByJobType(jobType: string): Promise<JobTemplate | null> {
-    return Array.from(this.templates.values()).find(t => t.id === jobType) || null;
-  }
-
-  async listTemplates(): Promise<JobTemplate[]> {
-    return Array.from(this.templates.values());
-  }
 
   async saveJobIntent(intent: JobIntentRecord): Promise<void> {
     this.jobIntents.set(intent.intentId as any, intent);
@@ -81,30 +60,6 @@ export class MemoryStorage implements IStoragePort {
     return this.results.get(jobId) || null;
   }
 
-  async saveResolution(resolution: ResolutionRecord): Promise<void> {
-    this.resolutions.set(resolution.id, resolution);
-  }
-
-  async getResolution(id: ResolutionId): Promise<ResolutionRecord | null> {
-    return this.resolutions.get(id) || null;
-  }
-
-  async getResolutionByJobId(jobId: JobId): Promise<ResolutionRecord | null> {
-    return Array.from(this.resolutions.values()).find(r => r.jobId === jobId) || null;
-  }
-
-  async saveAttempt(attempt: ExecutionAttempt): Promise<void> {
-    this.attempts.set(attempt.id, attempt);
-  }
-
-  async getAttempt(id: ExecutionId): Promise<ExecutionAttempt | null> {
-    return this.attempts.get(id) || null;
-  }
-
-  async listAttemptsByJobId(jobId: JobId): Promise<ExecutionAttempt[]> {
-    return Array.from(this.attempts.values()).filter(a => a.jobId === jobId);
-  }
-
   async saveDomainEvent(event: DomainEvent): Promise<void> {
     this.domainEvents.push(event);
   }
@@ -142,9 +97,5 @@ export class MemoryStorage implements IStoragePort {
 
   async releaseAdmissionLock(paymentIdentifier: string): Promise<void> {
     this.admissionLocks.delete(paymentIdentifier);
-  }
-
-  async seedTemplates(templates: JobTemplate[]) {
-    templates.forEach(t => this.templates.set(t.id, t));
   }
 }

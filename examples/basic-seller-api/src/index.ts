@@ -3,7 +3,6 @@ import { randomUUID } from 'crypto';
 import { 
   createCleared,
   SystemClock,
-  createJobTemplateId,
   hashInputs,
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
@@ -72,20 +71,6 @@ const callbackClient = new CallbackClient(storage, clock);
 const fakeWorker = new FakeWorker(callbackClient);
 
 const JOB_TYPE = 'tmpl_batch_enrichment_v1';
-const TEMPLATE_ID = createJobTemplateId(JOB_TYPE);
-
-storage.seedTemplates([{
-  id: TEMPLATE_ID,
-  name: 'Batch Enrichment V1',
-  description: 'AI-powered batch data enrichment and cleaning',
-  priceAmount: 1000000n,
-  priceCurrency: 'USDC',
-  inputSchema: { type: 'object' },
-  outputSchema: { type: 'object' },
-  slaSeconds: 60,
-  timeoutPolicy: 'REFUND',
-  createdAt: clock.now()
-}]);
 
 app.post('/v1/jobs/run', async (req, res, next) => {
   const { payment_proof, payment_identifier, inputs, idempotency_key } = req.body;
