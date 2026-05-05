@@ -25,9 +25,10 @@ export type JobIntentRequiredResult = {
 };
 
 export type PaidJobAcceptedResult = {
-  type: 'accepted' | 'already_accepted';
+  type: 'admitted' | 'already_admitted';
   intentId: string;
   jobId: string;
   status: JobStatus;
   paymentId: string;
+  enqueueStatus?: 'not_requested' | 'queued' | 'failed';
 };

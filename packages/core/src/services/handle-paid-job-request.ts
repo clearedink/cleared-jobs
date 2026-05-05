@@ -72,5 +72,6 @@ export async function handlePaidJobRequest(
     jobId: admission.jobId,
     status: admission.status,
     paymentId: admission.paymentId,
+    enqueueStatus: admission.enqueueStatus,
   };
 }

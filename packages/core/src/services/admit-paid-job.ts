@@ -107,6 +107,8 @@ export async function admitPaidJob(
       await storage.saveJobIntent(intent);
     }
 
+    let enqueueStatus: 'not_requested' | 'queued' | 'failed' = 'not_requested';
+
     if (input.enqueue) {
       try {
         await input.enqueue({
@@ -114,8 +116,13 @@ export async function admitPaidJob(
           jobType: job.jobType,
           payload: job.payload,
         });
+        job.status = 'queued';
+        job.queuedAt = now;
+        await storage.saveJob(job);
+        enqueueStatus = 'queued';
       } catch (err) {
         console.error(`Failed to enqueue job ${job.jobId}`, err);
+        enqueueStatus = 'failed';
         // Do not fail admission if enqueue fails (outbox pattern should be used in prod)
       }
     }
@@ -137,6 +144,7 @@ export async function admitPaidJob(
       status: job.status,
       paymentId: input.paymentId,
       intentId: input.intentId,
+      enqueueStatus,
     };
   });
 }

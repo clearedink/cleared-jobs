@@ -22,4 +22,5 @@ export type AdmitPaidJobResult = {
   status: JobStatus;
   paymentId: string;
   intentId?: string;
+  enqueueStatus?: 'not_requested' | 'queued' | 'failed';
 };
