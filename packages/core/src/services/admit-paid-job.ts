@@ -1,16 +1,16 @@
 import { randomUUID } from 'crypto';
-import { IStoragePort } from '../ports/storage';
-import { IClockPort } from '../ports/clock';
-import { AdmitPaidJobInput, AdmitPaidJobResult } from '../use-cases/admit';
-import { createJobId } from '../domain/ids';
-import { JobRecord, JobIntentRecord } from '../domain/models';
+import { IStoragePort } from '../ports/storage.js';
+import { IClockPort } from '../ports/clock.js';
+import { AdmitPaidJobInput, AdmitPaidJobResult } from '../use-cases/admit.js';
+import { createJobId } from '../domain/ids.js';
+import { JobRecord, JobIntentRecord } from '../domain/models.js';
 import {
   JobIntentExpiredError,
   JobIntentNotFoundError,
   PaymentAlreadyAdmittedError,
   IdempotencyConflictError,
   DomainError,
-} from '../lib/errors';
+} from '../lib/errors.js';
 
 export async function admitPaidJob(
   input: AdmitPaidJobInput,

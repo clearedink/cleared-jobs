@@ -1,9 +1,10 @@
-import { EnqueueArgs } from '../domain/models';
-import { JobStatus } from '../domain/statuses';
+import { EnqueueArgs } from '../domain/models.js';
+import { JobStatus } from '../domain/statuses.js';
+import { JobIntentId } from '../domain/ids.js';
 
 export type AdmitPaidJobInput = {
   paymentId: string;
-  intentId?: string;
+  intentId?: JobIntentId;
   payer: string;
   payTo?: string;
   amount: string;

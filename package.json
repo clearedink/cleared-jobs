@@ -1,7 +1,8 @@
 {
-  "name": "cleared-sdk-monorepo",
+  "name": "cleared-jobs",
   "private": true,
-  "description": "Cleared SDK: Hackathon-scoped durable job lifecycle for batch enrichment",
+  "description": "Durable job lifecycle SDK for x402-paid async work",
+  "type": "module",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
@@ -13,8 +14,14 @@
     "demo:timeout": "bash scripts/demo-timeout.sh"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0",
     "zod": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

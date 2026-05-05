@@ -1,4 +1,4 @@
-import { JobStatus } from '../domain/statuses';
+import { JobStatus } from '../domain/statuses.js';
 
 export class DomainError extends Error {
   constructor(message: string, public code: string) {

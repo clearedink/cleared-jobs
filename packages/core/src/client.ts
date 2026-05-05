@@ -1,10 +1,10 @@
-import { IStoragePort } from './ports/storage';
-import { handlePaidJobRequest } from './services/handle-paid-job-request';
-import { getOrCreateJobIntent } from './services/get-or-create-job-intent';
-import { admitPaidJob } from './services/admit-paid-job';
-import { startJob, completeJob, failJob, getJob, getResult } from './services/job-lifecycle';
-import { IClockPort } from './ports/clock';
-import { SystemClock } from './ports/clock';
+import { IStoragePort } from './ports/storage.js';
+import { handlePaidJobRequest } from './services/handle-paid-job-request.js';
+import { getOrCreateJobIntent } from './services/get-or-create-job-intent.js';
+import { admitPaidJob } from './services/admit-paid-job.js';
+import { startJob, completeJob, failJob, getJob, getResult } from './services/job-lifecycle.js';
+import { IClockPort } from './ports/clock.js';
+import { SystemClock } from './ports/clock.js';
 
 export interface ClearedConfig {
   storage: IStoragePort;

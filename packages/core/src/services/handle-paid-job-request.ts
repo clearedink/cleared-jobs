@@ -1,13 +1,13 @@
-import { IStoragePort } from '../ports/storage';
-import { IClockPort } from '../ports/clock';
+import { IStoragePort } from '../ports/storage.js';
+import { IClockPort } from '../ports/clock.js';
 import {
   HandlePaidJobRequestInput,
   HandlePaidJobRequestResult
-} from '../use-cases/handle-paid-job-request';
-import { getOrCreateJobIntent } from './get-or-create-job-intent';
-import { admitPaidJob } from './admit-paid-job';
+} from '../use-cases/handle-paid-job-request.js';
+import { getOrCreateJobIntent } from './get-or-create-job-intent.js';
+import { admitPaidJob } from './admit-paid-job.js';
 
-import { JobIntentRecord } from '../domain/models';
+import { JobIntentRecord } from '../domain/models.js';
 
 export type PaymentRequirementGenerator = (intent: JobIntentRecord) => Promise<unknown>;
 

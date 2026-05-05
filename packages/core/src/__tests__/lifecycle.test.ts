@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { randomUUID } from "crypto";
-import { createCleared, SystemClock, hashJobInput } from "../index";
-import { MemoryStorage } from "../../../storage-memory/src/memory-storage";
-import { MockX402Adapter } from "../../../x402-mock/src/mock-x402-adapter";
+import { createCleared, SystemClock, hashJobInput } from "../index.js";
+import { MemoryStorage } from "@cleared/storage-memory";
+import { MockX402Adapter } from "@cleared/x402-mock";
 
 describe("Job Lifecycle via Cleared Client", () => {
   let storage: MemoryStorage;

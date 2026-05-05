@@ -1,5 +1,5 @@
 import { JobIntentRecord, VerifiedX402Payment } from '@cleared/core';
-import { X402Challenge, X402PaymentProof } from './types';
+import { X402Challenge, X402PaymentProof } from './types.js';
 
 /**
  * MockX402Adapter

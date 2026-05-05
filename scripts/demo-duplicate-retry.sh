@@ -7,15 +7,16 @@ set -e
 API_URL="http://localhost:3000"
 
 echo "1. Getting initial quote and admitting job..."
-QUOTE_RESP=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d '{"inputs": {"idempotency": "demo-2"}}')
-QUOTE_ID=$(echo $QUOTE_RESP | jq -r .quoteId)
-PAYMENT_ID=$(echo $QUOTE_RESP | jq -r .paymentRequirement.paymentIdentifier)
+QUOTE_RESP=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d '{"idempotency_key": "demo-dup-1", "inputs": {"idempotency": "demo-2"}}')
+QUOTE_ID=$(echo $QUOTE_RESP | jq -r .intentId)
+PAYMENT_ID=$(echo $QUOTE_RESP | jq -r .paymentRequirement.token)
 
 PROOF='{"paymentIdentifier": "'$PAYMENT_ID'", "signature": "mock-proof-sig"}'
 ADMIT_1=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d "{
-  \"quote_id\": \"$QUOTE_ID\",
-  \"payment_identifier\": \"$PAYMENT_ID\",
-  \"payment_proof\": \"$(echo $PROOF | sed 's/"/\\"/g')\",
+  \"intent_id\": \"$QUOTE_ID\",
+  \"payment_id\": \"$PAYMENT_ID\",
+  \"payment_proof\": $PROOF,
+  \"idempotency_key\": \"demo-dup-1\",
   \"inputs\": {\"idempotency\": \"demo-2\"}
 }")
 
@@ -25,9 +26,10 @@ echo $ADMIT_1 | jq .
 
 echo -e "\n2. Retrying identical admission with same paymentIdentifier..."
 ADMIT_2=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d "{
-  \"quote_id\": \"$QUOTE_ID\",
-  \"payment_identifier\": \"$PAYMENT_ID\",
-  \"payment_proof\": \"$(echo $PROOF | sed 's/"/\\"/g')\",
+  \"intent_id\": \"$QUOTE_ID\",
+  \"payment_id\": \"$PAYMENT_ID\",
+  \"payment_proof\": $PROOF,
+  \"idempotency_key\": \"demo-dup-1\",
   \"inputs\": {\"idempotency\": \"demo-2\"}
 }")
 

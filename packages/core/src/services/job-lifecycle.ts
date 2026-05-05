@@ -1,13 +1,13 @@
 import { randomUUID } from 'crypto';
-import { IStoragePort } from '../ports/storage';
-import { IClockPort } from '../ports/clock';
-import { JobRecord, JobResult } from '../domain/models';
+import { IStoragePort } from '../ports/storage.js';
+import { IClockPort } from '../ports/clock.js';
+import { JobRecord, JobResult } from '../domain/models.js';
 import { 
   StartJobInput, 
   CompleteJobInput, 
   FailJobInput, 
-} from '../use-cases/jobs';
-import { InvalidJobTransitionError, JobNotFoundError } from '../lib/errors';
+} from '../use-cases/jobs.js';
+import { InvalidJobTransitionError, JobNotFoundError } from '../lib/errors.js';
 
 export async function startJob(
   jobId: string,

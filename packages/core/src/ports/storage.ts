@@ -1,6 +1,6 @@
-import { JobRecord, JobResult, JobIntentRecord } from '../domain/models';
-import { DomainEvent } from '../domain/events';
-import { JobId, JobIntentId } from '../domain/ids';
+import { JobRecord, JobResult, JobIntentRecord } from '../domain/models.js';
+import { DomainEvent } from '../domain/events.js';
+import { JobId, JobIntentId } from '../domain/ids.js';
 
 export interface IStoragePort {
   // Job Intents

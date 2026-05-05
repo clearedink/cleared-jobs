@@ -1,4 +1,4 @@
-import { JobPrice } from '../domain/models';
+import { JobPrice } from '../domain/models.js';
 
 export type GetOrCreateJobIntentInput = {
   idempotencyKey?: string;

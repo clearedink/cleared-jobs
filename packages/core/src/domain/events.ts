@@ -1,4 +1,4 @@
-import { JobId, JobIntentId } from './ids';
+import { JobId, JobIntentId } from './ids.js';
 
 export type DomainEventType =
   | 'JOB_INTENT_CREATED'

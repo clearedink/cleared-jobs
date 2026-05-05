@@ -1,10 +1,10 @@
 import { randomUUID, createHash } from 'crypto';
-import { IStoragePort } from '../ports/storage';
-import { IClockPort } from '../ports/clock';
-import { GetOrCreateJobIntentInput } from '../use-cases/job-intents';
-import { JobIntentRecord } from '../domain/models';
-import { createJobIntentId } from '../domain/ids';
-import { IdempotencyConflictError } from '../lib/errors';
+import { IStoragePort } from '../ports/storage.js';
+import { IClockPort } from '../ports/clock.js';
+import { GetOrCreateJobIntentInput } from '../use-cases/job-intents.js';
+import { JobIntentRecord } from '../domain/models.js';
+import { createJobIntentId } from '../domain/ids.js';
+import { IdempotencyConflictError } from '../lib/errors.js';
 
 export async function getOrCreateJobIntent(
   input: GetOrCreateJobIntentInput,

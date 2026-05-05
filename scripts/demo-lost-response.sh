@@ -7,15 +7,16 @@ set -e
 API_URL="http://localhost:3000"
 
 echo "1. Admitting job and 'disconnecting' from status polling..."
-QUOTE_RESP=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d '{"inputs": {"scenario": "lost-response"}}')
-QUOTE_ID=$(echo $QUOTE_RESP | jq -r .quoteId)
-PAYMENT_ID=$(echo $QUOTE_RESP | jq -r .paymentRequirement.paymentIdentifier)
+QUOTE_RESP=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d '{"idempotency_key": "demo-lost-1", "inputs": {"scenario": "lost-response"}}')
+QUOTE_ID=$(echo $QUOTE_RESP | jq -r .intentId)
+PAYMENT_ID=$(echo $QUOTE_RESP | jq -r .paymentRequirement.token)
 
 PROOF='{"paymentIdentifier": "'$PAYMENT_ID'", "signature": "mock-proof-sig"}'
 ADMIT_RESP=$(curl -s -X POST $API_URL/v1/jobs/run -H "Content-Type: application/json" -d "{
-  \"quote_id\": \"$QUOTE_ID\",
-  \"payment_identifier\": \"$PAYMENT_ID\",
-  \"payment_proof\": \"$(echo $PROOF | sed 's/"/\\"/g')\",
+  \"intent_id\": \"$QUOTE_ID\",
+  \"payment_id\": \"$PAYMENT_ID\",
+  \"payment_proof\": $PROOF,
+  \"idempotency_key\": \"demo-lost-1\",
   \"inputs\": {\"scenario\": \"lost-response\"}
 }")
 
@@ -30,7 +31,7 @@ RESULT_RESP=$(curl -s -X GET $API_URL/v1/jobs/$JOB_ID/result)
 echo $RESULT_RESP | jq .
 
 STATUS=$(echo $RESULT_RESP | jq -r .status)
-if [ "$STATUS" == "COMPLETED" ]; then
+if [ "$STATUS" == "completed" ]; then
   echo -e "\nSUCCESS: Result was safely stored and retrieved by the canonical jobId."
 else
   echo -e "\nFAILURE: Result not found or status incorrect."

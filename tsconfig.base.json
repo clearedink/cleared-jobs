@@ -12,8 +12,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "dist",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "forceConsistentCasingInFileNames": true
   }
 }

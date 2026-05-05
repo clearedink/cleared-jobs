@@ -1,2 +1,2 @@
-export * from './types';
-export * from './mock-x402-adapter';
+export * from './types.js';
+export * from './mock-x402-adapter.js';

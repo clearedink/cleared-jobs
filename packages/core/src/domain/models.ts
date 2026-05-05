@@ -1,5 +1,5 @@
-import { JobStatus, JobIntentStatus, JobFailureResolution } from './statuses';
-import { JobId, JobIntentId } from './ids';
+import { JobStatus, JobIntentStatus, JobFailureResolution } from './statuses.js';
+import { JobId, JobIntentId } from './ids.js';
 
 // -----------------------------------------------------------------------------
 // Public API Types from README

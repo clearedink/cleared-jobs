@@ -1,5 +1,5 @@
-import { JobStatus, JobIntentStatus } from '../domain/statuses';
-import { JobPrice, VerifiedX402Payment, EnqueueArgs } from '../domain/models';
+import { JobStatus, JobIntentStatus } from '../domain/statuses.js';
+import { JobPrice, VerifiedX402Payment, EnqueueArgs } from '../domain/models.js';
 
 export type HandlePaidJobRequestInput = {
   idempotencyKey?: string;

@@ -6,7 +6,7 @@ import {
   JobIntentRecord,
   JobIntentId,
   DomainEvent,
-} from '@cleared/core';
+} from '../../core/src/index.js';
 
 export class MemoryStorage implements IStoragePort {
   private jobIntents = new Map<JobIntentId, JobIntentRecord>();

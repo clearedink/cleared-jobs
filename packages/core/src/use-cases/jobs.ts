@@ -1,4 +1,4 @@
-import { JobFailureResolution } from '../domain/statuses';
+import { JobFailureResolution } from '../domain/statuses.js';
 
 export type StartJobInput = {
   workerId?: string;
