@@ -15,12 +15,12 @@ function sendPaymentRequired(res: express.Response, result: any) {
 function sendJobAccepted(
   res: express.Response,
   jobId: string,
-  replayed: boolean = false,
+  alreadyAdmitted: boolean = false,
 ) {
   return res.status(202).json({
     status: "accepted",
     jobId,
-    replayed,
+    alreadyAdmitted,
     pollUrl: `/v1/jobs/${jobId}`,
     resultUrl: `/v1/jobs/${jobId}/result`,
   });

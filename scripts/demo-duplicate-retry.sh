@@ -37,11 +37,11 @@ echo "Second Admission Response (Replay):"
 echo $ADMIT_2 | jq .
 
 JOB_ID_2=$(echo $ADMIT_2 | jq -r .jobId)
-REPLAYED=$(echo $ADMIT_2 | jq -r .replayed)
+ALREADY_ADMITTED=$(echo $ADMIT_2 | jq -r .alreadyAdmitted)
 
-if [ "$JOB_ID_1" == "$JOB_ID_2" ] && [ "$REPLAYED" == "true" ]; then
-  echo -e "\nSUCCESS: Canonical jobId preserved. replayed=true detected."
+if [ "$JOB_ID_1" == "$JOB_ID_2" ] && [ "$ALREADY_ADMITTED" == "true" ]; then
+  echo -e "\nSUCCESS: Canonical jobId preserved. alreadyAdmitted=true detected."
 else
-  echo -e "\nFAILURE: JobId mismatch or replayed flag missing."
+  echo -e "\nFAILURE: JobId mismatch or alreadyAdmitted flag missing."
   exit 1
 fi
