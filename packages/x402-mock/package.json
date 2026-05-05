@@ -1,9 +1,15 @@
 {
   "name": "@cleared/x402-mock",
   "version": "0.1.0",
+  "description": "Mock x402 adapter for Cleared demos and local development",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -11,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cleared/core": "workspace:*",
+    "@cleared/core": "0.1.0",
     "zod": "^3.0.0"
   },
   "publishConfig": {

@@ -1,17 +1,20 @@
 {
   "name": "@cleared/core",
   "version": "0.1.0",
+  "description": "Durable job lifecycle for x402-paid async work",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "zod": "^3.0.0"
   },
   "publishConfig": {
     "access": "public"
