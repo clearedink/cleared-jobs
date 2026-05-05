@@ -151,6 +151,31 @@ app.get('/v1/jobs/:jobId/result', async (req, res, next) => {
   }
 });
 
+// --- Admin & Debug Endpoints ---
+
+app.post('/admin/timeout-scan', async (req, res) => {
+  // Mocked timeout scan
+  return res.json({ scanned: 1, timedOut: 0 });
+});
+
+app.post('/admin/jobs/:jobId/refund', async (req, res, next) => {
+  try {
+    const job = await cleared.failJob(req.params.jobId, { 
+      reason: 'Admin override', 
+      resolution: 'refund_due' 
+    });
+    return res.json(job);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/debug/jobs/:jobId/audit', async (req, res) => {
+  const auditLogs = (storage as MemoryStorage).getAuditLogs();
+  const filtered = auditLogs.filter(log => log.resourceId === req.params.jobId);
+  return res.json(filtered);
+});
+
 app.use(clearedErrorHandler);
 
 const PORT = process.env.PORT || 3000;

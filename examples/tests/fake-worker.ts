@@ -4,9 +4,14 @@ import {
   failJob,
   IClockPort,
   IStoragePort,
-  JobId,
-  JobRecord
+  JobId
 } from '@cleared/core';
+
+export interface WorkerJob {
+  jobId: string;
+  executionId: string;
+  inputs: any;
+}
 
 /**
  * A client wrapper for workers to report their status back to the core.
@@ -18,15 +23,15 @@ export class CallbackClient {
     private clock: IClockPort
   ) {}
 
-  async startAttempt(jobId: JobId, workerId: string) {
-    await startJob(jobId, { workerId }, this.storage, this.clock);
+  async startAttempt(jobId: JobId, executionId: string) {
+    await startJob(jobId, { workerId: executionId }, this.storage, this.clock);
   }
 
-  async completeAttempt(jobId: JobId, result: Record<string, any>) {
+  async completeAttempt(jobId: JobId, output: Record<string, any>) {
     await completeJob(
       jobId,
       {
-        result,
+        result: output,
       },
       this.storage,
       this.clock
@@ -52,18 +57,18 @@ export class FakeWorker {
   /**
    * Simulates a deterministic batch_enrichment job
    */
-  async process(job: { id: JobId; inputs: Record<string, any>; executionId: string }): Promise<void> {
+  async process(job: WorkerJob): Promise<void> {
     // 1. Mark as started
-    await this.client.startAttempt(job.id, job.executionId);
+    await this.client.startAttempt(job.jobId as JobId, job.executionId);
 
     // 2. Simulate processing delay
-    const delay = (job.inputs as any).sleep_ms || 1000;
+    const delay = job.inputs.sleep_ms || 1000;
     await new Promise(resolve => setTimeout(resolve, delay));
 
     // 3. Selective failure based on input flag
-    if ((job.inputs as any).force_failure === true) {
+    if (job.inputs.force_failure === true) {
       await this.client.failAttempt(
-        job.id,
+        job.jobId as JobId,
         'Simulated failure: force_failure flag was set'
       );
       return;
@@ -71,7 +76,7 @@ export class FakeWorker {
 
     // 4. Deterministic success output
     const output = {
-      job_id: job.id,
+      job_id: job.jobId,
       processed_at: new Date().toISOString(),
       enriched_data: {
         original_inputs: job.inputs,
@@ -80,6 +85,6 @@ export class FakeWorker {
       },
     };
 
-    await this.client.completeAttempt(job.id, output);
+    await this.client.completeAttempt(job.jobId as JobId, output);
   }
 }

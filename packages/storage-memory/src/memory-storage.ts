@@ -103,4 +103,8 @@ export class MemoryStorage implements IStoragePort {
   async releaseAdmissionLock(paymentIdentifier: string): Promise<void> {
     this.admissionLocks.delete(paymentIdentifier);
   }
+
+  getAuditLogs(): any[] {
+    return this.auditLogs;
+  }
 }
