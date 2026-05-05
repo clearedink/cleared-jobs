@@ -1,4 +1,5 @@
 import { JobStatus, JobIntentStatus, JobFailureResolution } from './statuses';
+import { JobId, JobIntentId } from './ids';
 
 // -----------------------------------------------------------------------------
 // Public API Types from README
@@ -22,7 +23,7 @@ export type VerifiedX402Payment = {
 };
 
 export type JobIntentRecord = {
-  intentId: string;
+  intentId: JobIntentId;
   idempotencyKey: string;
   buyerKey: string;
   jobType: string;
@@ -30,7 +31,7 @@ export type JobIntentRecord = {
   price: JobPrice;
   payload: Record<string, unknown>;
   status: JobIntentStatus;
-  jobId?: string;
+  jobId?: JobId;
   paymentId?: string;
   createdAt: string;
   updatedAt: string;
@@ -39,8 +40,8 @@ export type JobIntentRecord = {
 };
 
 export type JobRecord = {
-  jobId: string;
-  intentId?: string;
+  jobId: JobId;
+  intentId?: JobIntentId;
   paymentId?: string;
   payer?: string;
   payTo?: string;
@@ -64,14 +65,14 @@ export type JobRecord = {
 };
 
 export type JobResult = {
-  jobId: string;
+  jobId: JobId;
   result: Record<string, unknown>;
   resultType?: string;
   createdAt: string;
 };
 
 export type EnqueueArgs = {
-  jobId: string;
+  jobId: JobId;
   jobType: string;
   payload: Record<string, unknown>;
 };
