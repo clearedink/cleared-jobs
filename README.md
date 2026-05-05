@@ -38,12 +38,12 @@ Most developers patch this together with Redis locks, queue IDs, and custom data
 Cleared gives paid async work a durable lifecycle:
 
 ```txt
-payment intent → funded admission → durable job → worker execution → result recovery
+job intent → paid admission → durable job → worker execution → result recovery
 ```
 
 It handles three important moments:
 
-- **Before payment:** Cleared creates or reuses a stable payment intent for the requested job.
+- **Before payment:** Cleared creates or reuses a stable job intent for the requested job.
 - **After payment:** Cleared attaches the verified x402 payment to that intent and admits exactly one durable `JobId`.
 - **During execution:** Cleared tracks job status, worker attempts, completion, failure, and result retrieval.
 
@@ -61,28 +61,33 @@ Use `handlePaidJobRequest()` inside the endpoint that requires payment.
 ```typescript
 // 1. Get or Create Intent
 if (!req.body.payment_proof) {
-  const intent = await cleared.getOrCreatePaymentIntent({
+  const intent = await cleared.getOrCreateJobIntent({
     idempotencyKey: req.header("Idempotency-Key"),
     buyerKey: req.body.agentId,
     jobType: "quest_submission",
     inputHash,
-    price: { amount: "1000000", currency: "USDC" },
+    price: { amount: "1000000", currency: "USDC", network: "sepolia" },
     payload: { questId, agentId, submissionUrl },
   });
   return res.status(402).json(intent.paymentRequirement);
 }
 
 // 2. Admit Job
-const result = await cleared.admitFundedJob({
-  paymentIntentId: req.body.payment_intent_id,
-  paymentIdentifier: req.body.payment_identifier,
-  paymentProof: req.body.payment_proof,
-  inputs: { questId, agentId, submissionUrl },
+const result = await cleared.admitPaidJob({
+  intentId: req.body.intent_id,
+  paymentId: req.body.payment_id,
+  payer: req.body.payer_address,
+  amount: "1000000",
+  currency: "USDC",
+  network: "sepolia",
+  jobType: "quest_submission",
+  inputHash,
+  payload: { questId, agentId, submissionUrl },
 });
 
 return res.status(202).json({
   jobId: result.jobId,
-  status: "ACCEPTED",
+  status: "ADMITTED",
   resultUrl: `/jobs/${result.jobId}/result`,
 });
 ```
@@ -148,22 +153,22 @@ app.get("/jobs/:jobId/result", async (req, res) => {
 
 ## Core API
 
-| Function                     | Purpose                                                                                 |
-| :--------------------------- | :-------------------------------------------------------------------------------------- |
-| `getOrCreatePaymentIntent()` | Main paid-route helper. Creates or reuses a stable payment intent before payment.       |
-| `admitFundedJob()`           | Lower-level helper for admitting a job after an x402 payment has already been verified. |
-| `startJob()`                 | Marks a job as running.                                                                 |
-| `completeJob()`              | Marks a job as completed and stores the result.                                         |
-| `failJob()`                  | Marks a job as failed and records the resolution path.                                  |
-| `getJob()`                   | Loads the current job state.                                                            |
-| `getResult()`                | Loads the final result for a completed job.                                             |
+| Function                  | Purpose                                                                                 |
+| :------------------------ | :-------------------------------------------------------------------------------------- |
+| `getOrCreateJobIntent()`  | Main paid-route helper. Creates or reuses a stable job intent before payment.       |
+| `admitPaidJob()`          | Lower-level helper for admitting a job after an x402 payment has already been verified. |
+| `startJob()`              | Marks a job as running.                                                                 |
+| `completeJob()`           | Marks a job as completed and stores the result.                                         |
+| `failJob()`               | Marks a job as failed and records the resolution path.                                  |
+| `getJob()`                | Loads the current job state.                                                            |
+| `getResult()`             | Loads the final result for a completed job.                                             |
 
 Full function signatures and type definitions live in `docs/api.md`.
 
 ## The Happy Path
 
 1. **Request:** Client calls a paid async endpoint with an `Idempotency-Key`.
-2. **Intent:** Cleared creates or reuses a stable payment intent for the requested job.
+2. **Intent:** Cleared creates or reuses a stable job intent for the requested job.
 3. **402 Response:** The service returns a `402 Payment Required` response tied to that intent.
 4. **Funded Retry:** The client pays through x402 and retries the request with payment proof.
 5. **Funded Admission:** Cleared attaches the verified payment to the intent and admits exactly one `JobId`.
@@ -186,7 +191,7 @@ Recommended production shape:
 ```txt
 official x402 library / facilitator
         ↓
-Cleared payment intent + funded admission
+Cleared job intent + paid admission
         ↓
 durable storage
         ↓

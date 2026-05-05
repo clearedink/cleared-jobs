@@ -5,7 +5,7 @@ This document describes the public API for Cleared Jobs.
 Cleared is designed for paid asynchronous work. It does not replace x402 payment libraries. Instead, it sits around the paid job lifecycle:
 
 ```txt
-payment intent → x402 payment → funded admission → job execution → result recovery
+job intent → x402 payment → paid admission → job execution → result recovery
 ```
 
 The main API is `handlePaidJobRequest()`. Lower-level APIs are available when applications want more control.
@@ -50,7 +50,7 @@ High-level convenience API for paid async routes.
 
 It handles both sides of the paid-job lifecycle:
 
-1. **Before payment**: creates or reuses a stable payment intent for the requested job.
+1. **Before payment**: creates or reuses a stable job intent for the requested job.
 2. **After payment**: attaches the verified x402 payment to that intent and admits exactly one durable job.
 
 Use this in the HTTP route that receives a paid job request.
@@ -109,7 +109,7 @@ export type HandlePaidJobRequestInput = {
    * Stable client-provided idempotency key.
    *
    * This is used before payment to prevent the same buyer from creating
-   * multiple payment intents for the same intended job.
+   * multiple job intents for the same intended job.
    *
    * Recommended source:
    *   req.header("Idempotency-Key")
@@ -178,7 +178,7 @@ export type HandlePaidJobRequestInput = {
   enqueue?: (args: EnqueueArgs) => Promise<void>;
 
   /**
-   * Optional metadata stored on the payment intent and job.
+   * Optional metadata stored on the job intent and job.
    */
   metadata?: Record<string, unknown>;
 };
@@ -188,12 +188,12 @@ export type HandlePaidJobRequestInput = {
 
 ```ts
 export type HandlePaidJobRequestResult =
-  | PaymentRequiredResult
+  | JobIntentRequiredResult
   | PaidJobAcceptedResult;
 ```
 
 ```ts
-export type PaymentRequiredResult = {
+export type JobIntentRequiredResult = {
   /**
    * No valid payment was attached yet.
    *
@@ -202,7 +202,7 @@ export type PaymentRequiredResult = {
   type: "payment_required";
 
   /**
-   * Stable pre-payment intent id.
+   * Stable pre-job intent id.
    */
   intentId: string;
 
@@ -216,7 +216,7 @@ export type PaymentRequiredResult = {
   /**
    * Current intent status.
    */
-  status: PaymentIntentStatus;
+  status: JobIntentStatus;
 };
 ```
 
@@ -226,10 +226,10 @@ export type PaidJobAcceptedResult = {
    * Payment was verified and a job was admitted,
    * or the same paid request was already admitted earlier.
    */
-  type: "accepted" | "already_accepted";
+  type: "admitted" | "already_admitted";
 
   /**
-   * Stable payment intent connected to this job.
+   * Stable job intent connected to this job.
    */
   intentId: string;
 
@@ -247,27 +247,32 @@ export type PaidJobAcceptedResult = {
    * Verified payment id connected to the job.
    */
   paymentId: string;
+
+  /**
+   * Result of the enqueue callback.
+   */
+  enqueueStatus?: "not_requested" | "queued" | "failed";
 };
 ```
 
 ---
 
-## `getOrCreatePaymentIntent()`
+## `getOrCreateJobIntent()`
 
-Lower-level API for creating or reusing a stable pre-payment intent.
+Lower-level API for creating or reusing a stable pre-job intent.
 
 Use this when your app wants to generate the x402 payment requirement separately from job admission.
 
 ```ts
-export async function getOrCreatePaymentIntent(
-  input: GetOrCreatePaymentIntentInput,
-): Promise<PaymentIntentRecord>;
+export async function getOrCreateJobIntent(
+  input: GetOrCreateJobIntentInput,
+): Promise<JobIntentRecord>;
 ```
 
 ### Example
 
 ```ts
-const intent = await cleared.getOrCreatePaymentIntent({
+const intent = await cleared.getOrCreateJobIntent({
   idempotencyKey: req.header("Idempotency-Key"),
   buyerKey: req.body.agentId,
   jobType: "account_research",
@@ -284,7 +289,7 @@ const intent = await cleared.getOrCreatePaymentIntent({
 ### Input
 
 ```ts
-export type GetOrCreatePaymentIntentInput = {
+export type GetOrCreateJobIntentInput = {
   /**
    * Stable client-provided idempotency key.
    */
@@ -316,7 +321,7 @@ export type GetOrCreatePaymentIntentInput = {
   payload: Record<string, unknown>;
 
   /**
-   * Optional expiration time for the payment intent.
+   * Optional expiration time for the job intent.
    */
   expiresAt?: string;
 
@@ -329,22 +334,22 @@ export type GetOrCreatePaymentIntentInput = {
 
 ---
 
-## `admitFundedJob()`
+## `admitPaidJob()`
 
 Lower-level API for admitting a job after payment has already been verified.
 
-Use this if your app already handles payment intent creation and x402 verification separately.
+Use this if your app already handles job intent creation and x402 verification separately.
 
 ```ts
-export async function admitFundedJob(
-  input: AdmitFundedJobInput,
-): Promise<AdmitFundedJobResult>;
+export async function admitPaidJob(
+  input: AdmitPaidJobInput,
+): Promise<AdmitPaidJobResult>;
 ```
 
 ### Example
 
 ```ts
-const receipt = await cleared.admitFundedJob({
+const receipt = await cleared.admitPaidJob({
   paymentId: req.x402.paymentId,
   payer: req.x402.payer,
   amount: req.x402.amount,
@@ -368,7 +373,7 @@ const receipt = await cleared.admitFundedJob({
 ### Input
 
 ```ts
-export type AdmitFundedJobInput = {
+export type AdmitPaidJobInput = {
   /**
    * Stable identifier for the verified payment.
    *
@@ -377,9 +382,9 @@ export type AdmitFundedJobInput = {
   paymentId: string;
 
   /**
-   * Optional pre-payment intent id.
+   * Optional pre-job intent id.
    *
-   * If provided, the job is attached to an existing payment intent.
+   * If provided, the job is attached to an existing job intent.
    */
   intentId?: string;
 
@@ -449,7 +454,7 @@ export type AdmitFundedJobInput = {
 ### Result
 
 ```ts
-export type AdmitFundedJobResult = {
+export type AdmitPaidJobResult = {
   /**
    * Whether this call created a new job or returned an existing one.
    */
@@ -471,7 +476,7 @@ export type AdmitFundedJobResult = {
   paymentId: string;
 
   /**
-   * Intent id, if the job was admitted from a payment intent.
+   * Intent id, if the job was admitted from a job intent.
    */
   intentId?: string;
 };
@@ -814,10 +819,10 @@ export type VerifiedX402Payment = {
 
 ---
 
-## `PaymentIntentStatus`
+## `JobIntentStatus`
 
 ```ts
-export type PaymentIntentStatus =
+export type JobIntentStatus =
   | "requires_payment"
   | "paid"
   | "expired"
@@ -826,12 +831,12 @@ export type PaymentIntentStatus =
 
 ---
 
-## `PaymentIntentRecord`
+## `JobIntentRecord`
 
 ```ts
-export type PaymentIntentRecord = {
+export type JobIntentRecord = {
   /**
-   * Stable pre-payment intent id.
+   * Stable pre-job intent id.
    */
   intentId: string;
 
@@ -866,9 +871,9 @@ export type PaymentIntentRecord = {
   payload: Record<string, unknown>;
 
   /**
-   * Current payment intent status.
+   * Current job intent status.
    */
-  status: PaymentIntentStatus;
+  status: JobIntentStatus;
 
   /**
    * Associated job id, if the intent has been funded and admitted.
@@ -921,7 +926,7 @@ export type JobRecord = {
   jobId: string;
 
   /**
-   * Stable payment intent id, if the job came from a payment intent.
+   * Stable job intent id, if the job came from a job intent.
    */
   intentId?: string;
 
@@ -1259,7 +1264,7 @@ A production storage adapter should enforce these rules at the database level wh
 
 ## Payment Intent Uniqueness
 
-The same buyer and idempotency key should resolve to one payment intent.
+The same buyer and idempotency key should resolve to one job intent.
 
 Recommended uniqueness:
 
@@ -1330,8 +1335,8 @@ chain-specific logic
 Cleared should own:
 
 ```txt
-payment intent
-funded job admission
+job intent
+paid job admission
 job status
 worker attempts
 result recovery

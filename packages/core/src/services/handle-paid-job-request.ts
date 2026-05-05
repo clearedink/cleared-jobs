@@ -7,7 +7,9 @@ import {
 import { getOrCreateJobIntent } from './get-or-create-job-intent';
 import { admitPaidJob } from './admit-paid-job';
 
-export type PaymentRequirementGenerator = (intentId: string) => Promise<unknown>;
+import { JobIntentRecord } from '../domain/models';
+
+export type PaymentRequirementGenerator = (intent: JobIntentRecord) => Promise<unknown>;
 
 export async function handlePaidJobRequest(
   input: HandlePaidJobRequestInput,
@@ -34,7 +36,7 @@ export async function handlePaidJobRequest(
   if (!input.payment) {
     let requirement = (intentResult as any).paymentRequirement; // internal engine check
     if (!requirement && generateRequirement) {
-      requirement = await generateRequirement(intentResult.intentId);
+      requirement = await generateRequirement(intentResult);
     }
 
     return {

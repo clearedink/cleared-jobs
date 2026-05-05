@@ -15,8 +15,11 @@ export function createCleared(config: ClearedConfig) {
   const clock = config.clock || new SystemClock();
 
   return {
-    handlePaidJobRequest: async (input: Parameters<typeof handlePaidJobRequest>[0]) => {
-      return handlePaidJobRequest(input, config.storage, clock);
+    handlePaidJobRequest: async (
+      input: Parameters<typeof handlePaidJobRequest>[0],
+      generateRequirement?: Parameters<typeof handlePaidJobRequest>[3]
+    ) => {
+      return handlePaidJobRequest(input, config.storage, clock, generateRequirement);
     },
     getOrCreateJobIntent: async (input: Parameters<typeof getOrCreateJobIntent>[0]) => {
       return getOrCreateJobIntent(input, config.storage, clock);

@@ -1,4 +1,5 @@
-import { EnqueueArgs, JobStatus } from '../domain/models';
+import { EnqueueArgs } from '../domain/models';
+import { JobStatus } from '../domain/statuses';
 
 export type AdmitPaidJobInput = {
   paymentId: string;

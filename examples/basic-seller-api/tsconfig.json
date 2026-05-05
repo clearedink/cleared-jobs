@@ -7,7 +7,7 @@
   "references": [
     { "path": "../../packages/core" },
 
-    { "path": "../../packages/payment-x402" },
+    { "path": "../../packages/x402-mock" },
     { "path": "../../packages/storage-memory" }
   ]
 }
