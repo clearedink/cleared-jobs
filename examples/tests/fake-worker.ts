@@ -1,12 +1,11 @@
 import {
-  ExecutionId,
   startJob,
   completeJob,
   failJob,
   IClockPort,
   IStoragePort,
   JobId,
-  WorkerJob
+  JobRecord
 } from '@cleared/core';
 
 /**
@@ -19,28 +18,27 @@ export class CallbackClient {
     private clock: IClockPort
   ) {}
 
-  async startAttempt(jobId: JobId, executionId: ExecutionId) {
-    await startJob({ jobId, executionId }, this.storage, this.clock);
+  async startAttempt(jobId: JobId, workerId: string) {
+    await startJob(jobId, { workerId }, this.storage, this.clock);
   }
 
-  async completeAttempt(jobId: JobId, executionId: ExecutionId, output: Record<string, any>) {
+  async completeAttempt(jobId: JobId, result: Record<string, any>) {
     await completeJob(
+      jobId,
       {
-        jobId,
-        executionId,
-        output,
+        result,
       },
       this.storage,
       this.clock
     );
   }
 
-  async failAttempt(jobId: JobId, executionId: ExecutionId, error: string) {
+  async failAttempt(jobId: JobId, error: string) {
     await failJob(
+      jobId,
       {
-        jobId,
-        executionId,
-        error,
+        reason: error,
+        resolution: 'manual_review',
       },
       this.storage,
       this.clock
@@ -54,19 +52,18 @@ export class FakeWorker {
   /**
    * Simulates a deterministic batch_enrichment job
    */
-  async process(job: WorkerJob): Promise<void> {
+  async process(job: { id: JobId; inputs: Record<string, any>; executionId: string }): Promise<void> {
     // 1. Mark as started
-    await this.client.startAttempt(job.jobId, job.executionId);
+    await this.client.startAttempt(job.id, job.executionId);
 
     // 2. Simulate processing delay
-    const delay = job.inputs.sleep_ms || 1000;
+    const delay = (job.inputs as any).sleep_ms || 1000;
     await new Promise(resolve => setTimeout(resolve, delay));
 
     // 3. Selective failure based on input flag
-    if (job.inputs.force_failure === true) {
+    if ((job.inputs as any).force_failure === true) {
       await this.client.failAttempt(
-        job.jobId,
-        job.executionId,
+        job.id,
         'Simulated failure: force_failure flag was set'
       );
       return;
@@ -74,7 +71,7 @@ export class FakeWorker {
 
     // 4. Deterministic success output
     const output = {
-      job_id: job.jobId,
+      job_id: job.id,
       processed_at: new Date().toISOString(),
       enriched_data: {
         original_inputs: job.inputs,
@@ -83,6 +80,6 @@ export class FakeWorker {
       },
     };
 
-    await this.client.completeAttempt(job.jobId, job.executionId, output);
+    await this.client.completeAttempt(job.id, output);
   }
 }

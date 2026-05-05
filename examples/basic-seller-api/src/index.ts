@@ -80,16 +80,12 @@ app.post('/v1/jobs/run', async (req, res, next) => {
     
     let payment = undefined;
     if (payment_proof) {
-      const verification = await payments.verifyProof(payment_proof);
-      if (verification.verified) {
-        payment = {
-          paymentId: verification.paymentIdentifier,
-          payer: '0xBuyer',
-          amount: verification.amount.toString(),
-          currency: verification.currency as 'USDC',
-          network: 'test',
-        };
-      } else {
+      try {
+        payment = payments.verifyMockPaymentProof(
+          payment_proof,
+          { amount: '1', currency: 'USDC', network: 'test' }
+        );
+      } catch (err) {
         return sendError(res, 400, 'INVALID_PAYMENT_PROOF', 'The provided payment proof is invalid.');
       }
     }
@@ -115,16 +111,9 @@ app.post('/v1/jobs/run', async (req, res, next) => {
           }, 0);
         }
       },
-      storage,
-      clock,
-      async (intentId) => {
+      async (intent) => {
         // Generate requirement dynamically
-        const req = await payments.createIntent({
-          id: idempotency_key || randomUUID(),
-          priceAmount: 1000000n,
-          priceCurrency: 'USDC'
-        } as any);
-        return req;
+        return payments.createMockPaymentRequirement(intent);
       }
     );
 
