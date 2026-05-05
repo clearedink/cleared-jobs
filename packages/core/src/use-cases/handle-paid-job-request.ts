@@ -2,8 +2,8 @@ import { JobStatus, JobIntentStatus } from '../domain/statuses';
 import { JobPrice, VerifiedX402Payment, EnqueueArgs } from '../domain/models';
 
 export type HandlePaidJobRequestInput = {
-  idempotencyKey: string;
-  buyerKey: string;
+  idempotencyKey?: string;
+  buyerKey?: string;
   jobType: string;
   inputHash: string;
   price: JobPrice;

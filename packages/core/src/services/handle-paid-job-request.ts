@@ -6,7 +6,6 @@ import {
 } from '../use-cases/handle-paid-job-request';
 import { getOrCreateJobIntent } from './get-or-create-job-intent';
 import { admitPaidJob } from './admit-paid-job';
-import { MissingIdempotencyKeyError } from '../lib/errors';
 
 export type PaymentRequirementGenerator = (intentId: string) => Promise<unknown>;
 
@@ -16,11 +15,8 @@ export async function handlePaidJobRequest(
   clock: IClockPort,
   generateRequirement?: PaymentRequirementGenerator
 ): Promise<HandlePaidJobRequestResult> {
-  if (!input.idempotencyKey) {
-    throw new MissingIdempotencyKeyError();
-  }
-
   // 1. Ensure a stable payment intent exists
+  // getOrCreateJobIntent now handles deriving idempotency if missing
   const intentResult = await getOrCreateJobIntent(
     {
       idempotencyKey: input.idempotencyKey,
@@ -36,14 +32,14 @@ export async function handlePaidJobRequest(
 
   // 2. If no payment provided, return payment requirement
   if (!input.payment) {
-    let requirement = intentResult.paymentRequirement;
+    let requirement = (intentResult as any).paymentRequirement; // internal engine check
     if (!requirement && generateRequirement) {
-      requirement = await generateRequirement(intentResult.jobIntentId);
+      requirement = await generateRequirement(intentResult.intentId);
     }
 
     return {
       type: 'payment_required',
-      intentId: intentResult.jobIntentId,
+      intentId: intentResult.intentId,
       paymentRequirement: requirement,
       status: intentResult.status,
     };
@@ -52,7 +48,7 @@ export async function handlePaidJobRequest(
   // 3. Payment provided -> Admit Job
   const admission = await admitPaidJob(
     {
-      intentId: intentResult.jobIntentId,
+      intentId: intentResult.intentId,
       paymentId: input.payment.paymentId,
       payer: input.payment.payer,
       payTo: input.payment.payTo,
@@ -72,7 +68,7 @@ export async function handlePaidJobRequest(
 
   return {
     type: admission.type,
-    intentId: intentResult.jobIntentId,
+    intentId: intentResult.intentId,
     jobId: admission.jobId,
     status: admission.status,
     paymentId: admission.paymentId,

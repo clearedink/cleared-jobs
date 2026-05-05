@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
 import { GetOrCreateJobIntentInput } from '../use-cases/job-intents';
@@ -11,27 +11,42 @@ export async function getOrCreateJobIntent(
   storage: IStoragePort,
   clock: IClockPort
 ): Promise<JobIntentRecord> {
-  const existingIntent = await storage.findJobIntentByIdempotencyKey(input.buyerKey, input.idempotencyKey);
-  
-  if (existingIntent) {
-    if (existingIntent.inputHash !== input.inputHash) {
-      throw new IdempotencyConflictError(existingIntent.inputHash, input.inputHash);
-    }
-    return existingIntent;
+  let lookupKey = input.idempotencyKey;
+  let buyerKey = input.buyerKey;
+
+  // 1. Resolve idempotency lookup key
+  if (!lookupKey && buyerKey) {
+    // Derive from buyer + work identity
+    lookupKey = createHash('sha256')
+      .update(`${buyerKey}:${input.jobType}:${input.inputHash}`)
+      .digest('hex');
   }
 
+  // 2. Perform lookup if we have a key
+  if (lookupKey) {
+    const existingIntent = await storage.findJobIntentByIdempotencyKey(buyerKey || 'anonymous', lookupKey);
+    
+    if (existingIntent) {
+      if (existingIntent.inputHash !== input.inputHash) {
+        throw new IdempotencyConflictError(existingIntent.inputHash, input.inputHash);
+      }
+      return existingIntent;
+    }
+  }
+
+  // 3. Create new intent
   const intentId = createJobIntentId(randomUUID());
   const now = clock.now().toISOString();
 
   const intent: JobIntentRecord = {
     intentId,
-    idempotencyKey: input.idempotencyKey,
-    buyerKey: input.buyerKey,
+    idempotencyKey: lookupKey || randomUUID(), // fallback for record integrity
+    buyerKey: buyerKey || 'anonymous',
     jobType: input.jobType,
     inputHash: input.inputHash,
     price: input.price,
     payload: input.payload,
-    status: 'requires_payment', // Using README status
+    status: 'requires_payment',
     createdAt: now,
     updatedAt: now,
     expiresAt: input.expiresAt,
@@ -44,10 +59,10 @@ export async function getOrCreateJobIntent(
     id: randomUUID(),
     timestamp: new Date(now),
     action: 'JOB_INTENT_CREATED',
-    actor: 'SYSTEM',
+    actor: buyerKey || 'SYSTEM',
     resourceType: 'JOB_INTENT',
     resourceId: intentId,
-    payload: { jobType: input.jobType, idempotencyKey: input.idempotencyKey },
+    payload: { jobType: input.jobType, idempotencyKey: intent.idempotencyKey },
     metadata: {},
   });
 
