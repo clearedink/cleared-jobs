@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "@cleared/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

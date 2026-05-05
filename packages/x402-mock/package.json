@@ -13,5 +13,8 @@
   "dependencies": {
     "@cleared/core": "workspace:*",
     "zod": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
