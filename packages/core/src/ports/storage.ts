@@ -16,7 +16,7 @@ export interface IStoragePort {
   listActiveJobs(): Promise<JobRecord[]>;
 
   // Results
-  saveResult(result: JobResult): Promise<void>;
+  putResultOnce(result: JobResult): Promise<JobResult>;
   getResult(jobId: JobId): Promise<JobResult | null>;
 
   // Events

@@ -8,6 +8,8 @@ import {
   JobIntentExpiredError,
   JobIntentNotFoundError,
   PaymentAlreadyAdmittedError,
+  IdempotencyConflictError,
+  DomainError,
 } from '../lib/errors';
 
 export async function admitPaidJob(
@@ -25,6 +27,22 @@ export async function admitPaidJob(
     }
     if (intent.expiresAt && new Date(intent.expiresAt) < clock.now()) {
       throw new JobIntentExpiredError(input.intentId);
+    }
+
+    if (intent.inputHash !== input.inputHash) {
+      throw new IdempotencyConflictError(intent.inputHash, input.inputHash);
+    }
+    if (intent.jobType !== input.jobType) {
+      throw new DomainError(`Job type mismatch: intent has ${intent.jobType}, input has ${input.jobType}`, 'INTENT_MISMATCH');
+    }
+    if (intent.price.amount !== input.amount) {
+      throw new DomainError(`Price amount mismatch: intent has ${intent.price.amount}, input has ${input.amount}`, 'INTENT_MISMATCH');
+    }
+    if (intent.price.currency !== input.currency) {
+      throw new DomainError(`Price currency mismatch: intent has ${intent.price.currency}, input has ${input.currency}`, 'INTENT_MISMATCH');
+    }
+    if (intent.price.network !== input.network) {
+      throw new DomainError(`Price network mismatch: intent has ${intent.price.network}, input has ${input.network}`, 'INTENT_MISMATCH');
     }
 
     if (intent.jobId) {

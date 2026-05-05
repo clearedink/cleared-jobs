@@ -52,8 +52,13 @@ export class MemoryStorage implements IStoragePort {
     return Array.from(this.jobs.values()).filter(j => !terminalStatuses.includes(j.status));
   }
 
-  async saveResult(result: JobResult): Promise<void> {
+  async putResultOnce(result: JobResult): Promise<JobResult> {
+    const existing = this.results.get(result.jobId as any);
+    if (existing) {
+      return existing;
+    }
     this.results.set(result.jobId as any, result);
+    return result;
   }
 
   async getResult(jobId: JobId): Promise<JobResult | null> {

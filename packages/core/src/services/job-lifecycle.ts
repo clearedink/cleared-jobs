@@ -94,7 +94,7 @@ export async function completeJob(
     resultType: input.resultType,
     createdAt: now,
   };
-  await storage.saveResult(jobResult);
+  await storage.putResultOnce(jobResult);
 
   await storage.saveAuditLog({
     id: randomUUID(),
