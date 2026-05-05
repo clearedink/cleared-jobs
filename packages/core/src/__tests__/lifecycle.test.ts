@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { 
   createCleared,
   SystemClock,
-  hashInputs
+  hashJobInput
 } from '../index';
 import { MemoryStorage } from '../../../storage-memory/src/memory-storage';
 import { MockX402Adapter } from '../../../payment-x402/src/mock-x402-adapter';
@@ -29,7 +29,7 @@ describe('Job Lifecycle via Cleared Client', () => {
 
   it('1. getOrCreateJobIntent returns job intent record', async () => {
     const inputs = { foo: 'bar' };
-    const inputHash = hashInputs(jobType, inputs);
+    const inputHash = hashJobInput(jobType, inputs);
     
     const result = await cleared.getOrCreateJobIntent({
       idempotencyKey: 'id-1',
@@ -46,7 +46,7 @@ describe('Job Lifecycle via Cleared Client', () => {
 
   it('2. handlePaidJobRequest orchestrates full flow', async () => {
     const inputs = { foo: 'bar' };
-    const inputHash = hashInputs(jobType, inputs);
+    const inputHash = hashJobInput(jobType, inputs);
     const idempotencyKey = 'id-2';
 
     // Step A: Initial request (no verified payment)
@@ -113,7 +113,7 @@ describe('Job Lifecycle via Cleared Client', () => {
 
   it('3. successful completion stores one canonical result', async () => {
     const inputs = {};
-    const inputHash = hashInputs(jobType, inputs);
+    const inputHash = hashJobInput(jobType, inputs);
     
     const intent = await cleared.getOrCreateJobIntent({
       idempotencyKey: 'id-3',
@@ -152,7 +152,7 @@ describe('Job Lifecycle via Cleared Client', () => {
 
   it('4. failure transitions and rules', async () => {
     const inputs = {};
-    const inputHash = hashInputs(jobType, inputs);
+    const inputHash = hashJobInput(jobType, inputs);
     
     const intent = await cleared.getOrCreateJobIntent({
       idempotencyKey: 'id-4',

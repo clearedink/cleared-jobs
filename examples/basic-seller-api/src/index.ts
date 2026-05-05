@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { 
   createCleared,
   SystemClock,
-  hashInputs,
+  hashJobInput,
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
 import { MockX402Adapter } from '@cleared/x402-mock';
@@ -76,7 +76,7 @@ app.post('/v1/jobs/run', async (req, res, next) => {
   const { payment_proof, payment_identifier, inputs, idempotency_key } = req.body;
 
   try {
-    const inputHash = hashInputs(JOB_TYPE, inputs || {});
+    const inputHash = hashJobInput(JOB_TYPE, inputs || {});
     
     let payment = undefined;
     if (payment_proof) {

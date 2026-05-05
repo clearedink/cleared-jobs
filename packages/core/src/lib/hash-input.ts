@@ -1,18 +1,11 @@
 import { createHash } from 'crypto';
 
 /**
- * Standardize input hashing for quote idempotency
+ * Creates a stable hash of job input for idempotency.
  */
-export function hashInputs(templateId: string, inputs: Record<string, any>): string {
-  const payload = JSON.stringify({
-    templateId,
-    inputs: Object.keys(inputs)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = inputs[key];
-        return acc;
-      }, {} as any),
-  });
-
-  return createHash('sha256').update(payload).digest('hex');
+export function hashJobInput(jobType: string, payload: Record<string, any>): string {
+  const normalized = JSON.stringify(payload, Object.keys(payload).sort());
+  return createHash('sha256')
+    .update(`${jobType}:${normalized}`)
+    .digest('hex');
 }
