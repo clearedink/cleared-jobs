@@ -1,20 +1,11 @@
-import { JobId, PaymentIntentId, PaymentId, ExecutionId, ResolutionId } from './ids';
-import { JobStatus, PaymentIntentStatus, EscrowState, ResolutionState } from './statuses';
+import { JobId, JobIntentId } from './ids';
 
 export type DomainEventType =
-  | 'PAYMENT_INTENT_CREATED'
-  | 'PAYMENT_INTENT_FUNDED'
+  | 'JOB_INTENT_CREATED'
   | 'JOB_ADMITTED'
-  | 'JOB_DISPATCHED'
   | 'JOB_STARTED'
   | 'JOB_COMPLETED'
-  | 'JOB_FAILED'
-  | 'ESCROW_RELEASE_PENDING'
-  | 'ESCROW_RELEASED'
-  | 'ESCROW_REFUND_PENDING'
-  | 'ESCROW_REFUNDED'
-  | 'RESOLUTION_MANUAL_REVIEW_TRIGGERED'
-  | 'OPERATOR_ACTION_TAKEN';
+  | 'JOB_FAILED';
 
 export interface BaseEvent {
   id: string;
@@ -22,54 +13,46 @@ export interface BaseEvent {
   aggregateId: string;
 }
 
-export interface PaymentIntentCreatedEvent extends BaseEvent {
-  type: 'PAYMENT_INTENT_CREATED';
-  paymentIntentId: PaymentIntentId;
+export interface JobIntentCreatedEvent extends BaseEvent {
+  type: 'JOB_INTENT_CREATED';
+  intentId: JobIntentId;
 }
 
 export interface JobAdmittedEvent extends BaseEvent {
   type: 'JOB_ADMITTED';
   jobId: JobId;
-  paymentIdentifier: string;
+}
+
+export interface JobStartedEvent extends BaseEvent {
+  type: 'JOB_STARTED';
+  jobId: JobId;
 }
 
 export interface JobCompletedEvent extends BaseEvent {
   type: 'JOB_COMPLETED';
   jobId: JobId;
-  outputHash: string;
 }
 
-export interface EscrowReleasedEvent extends BaseEvent {
-  type: 'ESCROW_RELEASED';
+export interface JobFailedEvent extends BaseEvent {
+  type: 'JOB_FAILED';
   jobId: JobId;
-  paymentId: PaymentId;
-}
-
-export interface OperatorActionEvent extends BaseEvent {
-  type: 'OPERATOR_ACTION_TAKEN';
-  actor: string;
-  action: string;
   reason: string;
 }
 
 export type DomainEvent =
-  | PaymentIntentCreatedEvent
+  | JobIntentCreatedEvent
   | JobAdmittedEvent
+  | JobStartedEvent
   | JobCompletedEvent
-  | EscrowReleasedEvent
-  | OperatorActionEvent;
+  | JobFailedEvent;
 
 export interface AuditLogEntry {
   id: string;
   timestamp: Date;
   action: string;
-  actor: string; // 'SYSTEM', 'WORKER', or operator ID
-  resourceType: 'JOB' | 'PAYMENT_INTENT' | 'PAYMENT' | 'RESOLUTION';
+  actor: string;
+  resourceType: 'JOB' | 'JOB_INTENT' | 'PAYMENT';
   resourceId: string;
   payload: Record<string, any>;
-  metadata: {
-    ipAddress?: string;
-    userAgent?: string;
-    correlationId?: string;
-  };
+  metadata: Record<string, any>;
 }
