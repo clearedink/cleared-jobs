@@ -1,6 +1,6 @@
 {
   "name": "cleared-jobs",
-  "private": true,
+  "private": false,
   "description": "Durable job lifecycle SDK for x402-paid async work",
   "type": "module",
   "scripts": {
