@@ -3,7 +3,7 @@ import { IStoragePort } from '../ports/storage';
 import { IClockPort } from '../ports/clock';
 import { AdmitPaidJobInput, AdmitPaidJobResult } from '../use-cases/admit';
 import { createJobId } from '../domain/ids';
-import { JobRecord } from '../domain/models';
+import { JobRecord, JobIntentRecord } from '../domain/models';
 import {
   JobIntentExpiredError,
   JobIntentNotFoundError,
@@ -16,14 +16,28 @@ export async function admitPaidJob(
   clock: IClockPort
 ): Promise<AdmitPaidJobResult> {
   const now = clock.now().toISOString();
+  let intent: JobIntentRecord | null = null;
 
   if (input.intentId) {
-    const intent = await storage.getJobIntent(input.intentId as any);
+    intent = await storage.getJobIntent(input.intentId as any);
     if (!intent) {
       throw new JobIntentNotFoundError(input.intentId);
     }
     if (intent.expiresAt && new Date(intent.expiresAt) < clock.now()) {
       throw new JobIntentExpiredError(input.intentId);
+    }
+
+    if (intent.jobId) {
+      const existingJob = await storage.getJob(intent.jobId as any);
+      if (existingJob) {
+        return {
+          type: 'already_admitted',
+          jobId: existingJob.jobId,
+          status: existingJob.status,
+          paymentId: existingJob.paymentId!,
+          intentId: existingJob.intentId,
+        };
+      }
     }
     
     intent.status = 'paid';
@@ -68,6 +82,12 @@ export async function admitPaidJob(
     };
 
     await storage.saveJob(job);
+
+    if (intent) {
+      intent.jobId = jobId;
+      intent.updatedAt = now;
+      await storage.saveJobIntent(intent);
+    }
 
     if (input.enqueue) {
       try {
