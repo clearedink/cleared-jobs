@@ -7,6 +7,7 @@ import {
   JobStatus,
   hashInputs
 } from '../index';
+import { evaluateTimeouts } from '../services/timeout-evaluator';
 import { MemoryStorage } from '../../../storage-memory/src/memory-storage';
 import { MockX402Adapter } from '../../../payment-x402/src/mock-x402-adapter';
 
