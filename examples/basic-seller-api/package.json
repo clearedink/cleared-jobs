@@ -10,7 +10,7 @@
   "dependencies": {
     "@cleared/core": "workspace:*",
 
-    "@cleared/payment-x402": "workspace:*",
+    "@cleared/x402-mock": "workspace:*",
     "@cleared/storage-memory": "workspace:*",
 
     "express": "^4.18.0"

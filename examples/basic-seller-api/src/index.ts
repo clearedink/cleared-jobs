@@ -7,7 +7,7 @@ import {
   hashInputs,
 } from '@cleared/core';
 import { MemoryStorage } from '@cleared/storage-memory';
-import { MockX402Adapter } from '@cleared/payment-x402';
+import { MockX402Adapter } from '@cleared/x402-mock';
 
 function sendPaymentRequired(res: express.Response, result: any) {
   return res.status(402).json({
