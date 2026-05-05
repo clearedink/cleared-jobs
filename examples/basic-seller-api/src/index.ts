@@ -105,7 +105,7 @@ app.post('/v1/jobs/run', async (req, res, next) => {
           setTimeout(() => {
             cleared.getJob(jobId).then(job => {
               if (job) {
-                fakeWorker.process({ id: job.jobId, inputs: job.payload, executionId: randomUUID() } as any).catch(console.error);
+                fakeWorker.process({ jobId: job.jobId, inputs: job.payload, executionId: randomUUID() }).catch(console.error);
               }
             });
           }, 0);

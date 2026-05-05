@@ -18,7 +18,7 @@ export class MemoryStorage implements IStoragePort {
   private admissionLocks = new Set<string>();
 
   async saveJobIntent(intent: JobIntentRecord): Promise<void> {
-    this.jobIntents.set(intent.intentId as any, intent);
+    this.jobIntents.set(intent.intentId, intent);
   }
 
   async getJobIntent(id: JobIntentId): Promise<JobIntentRecord | null> {
@@ -36,7 +36,7 @@ export class MemoryStorage implements IStoragePort {
   }
 
   async saveJob(job: JobRecord): Promise<void> {
-    this.jobs.set(job.jobId as any, job);
+    this.jobs.set(job.jobId, job);
   }
 
   async getJob(id: JobId): Promise<JobRecord | null> {
@@ -53,11 +53,11 @@ export class MemoryStorage implements IStoragePort {
   }
 
   async putResultOnce(result: JobResult): Promise<JobResult> {
-    const existing = this.results.get(result.jobId as any);
+    const existing = this.results.get(result.jobId);
     if (existing) {
       return existing;
     }
-    this.results.set(result.jobId as any, result);
+    this.results.set(result.jobId, result);
     return result;
   }
 
