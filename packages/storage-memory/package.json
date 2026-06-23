@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clearedink/core": "0.1.0"
+    "@clearedink/core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"
